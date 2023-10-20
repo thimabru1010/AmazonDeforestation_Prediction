@@ -36,6 +36,9 @@ parser.add_argument('--overlap', type=float, default=0.8,
 parser.add_argument('--patch_size', type=int, default=256,
     help = 'Size of each patch extracted from the whole image')
 
+parser.add_argument('--test_fill', type=int, default=3,
+    help = 'Number of months of test set to complete validation set')
+
 args = parser.parse_args()
 
 def plot_images(image1, image2, area):
@@ -76,7 +79,7 @@ def extract_patches(image: np.ndarray, patch_size: int, stride: int) -> np.ndarr
     window_shape_array = (image.shape[0], patch_size, patch_size)
     return np.array(view_as_windows(image, window_shape_array, step=stride)).reshape((-1,) + window_shape_array)
 
-def preprocess_patches(img_train, patch_size, overlap_stride):
+def preprocess_patches(img_train: np.ndarray, patch_size: int, overlap_stride: int):
     print('Extracting patches...')
     patches = extract_patches(img_train, patch_size=patch_size, stride=overlap_stride)
     patches = patches.reshape((-1, img_train.shape[0], patch_size, patch_size))
@@ -94,6 +97,18 @@ def preprocess_patches(img_train, patch_size, overlap_stride):
     print(f'Reshaping in trimesters: {patches_filt.shape}')
     return patches_filt
     
+def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, window_size: int=5, window_stride: int=1):
+    folder_path = save_path / modality
+    os.makedirs(folder_path, exist_ok=True)
+                
+    total_iterations = sum((patch.shape[1] - window_size + 1) // window_stride for patch in patches)
+    with tqdm(total=total_iterations, desc='Saving Patches') as pbar:
+        for i, patch in enumerate(patches):
+            for j in range(0, patch.shape[1] - window_size + 1, window_stride):
+                windowed_patch = patch[:, j:j+window_size]
+                np.save(os.path.join(folder_path, f'patch={i}_trimester_window={j}.npy'), windowed_patch)
+                pbar.update(1)
+
 if __name__== '__main__':
     print('Preprocessing training images')
     # 0-12->2017, 13-22->2018, 23-36-> 2019
@@ -116,9 +131,15 @@ if __name__== '__main__':
     for i in range(img_train.shape[0]):
         img_train[i, :, :][mask == 2.0] = 2.0
 
-    # 23-36-> 2019
-    img_val = img_train[24:36, :, :]
-    # 0-12->2017, 13-22->2018, 
+    #! Loading test to balance validation set
+    # 0-12->2020, 13-22->2021, 23-36-> 2022
+    img_test = load_tif_image(args.test_path)
+    # print(f'Img test shape: {img_test.shape}')
+    
+    # 23-36->2019 + 0-3->2020
+    img_val = np.concatenate((img_train[24:36, :, :], img_test[:args.test_fill, :, :]), axis=0)
+    
+    # 0-12->2017, 13-22->2018
     img_train = img_train[:24, :, :]
     
     ## Preprocessing Training images
@@ -126,28 +147,18 @@ if __name__== '__main__':
     train_stride = int((1-args.overlap)*args.patch_size)
     patches_filt = preprocess_patches(img_train, args.patch_size, train_stride)
 
-    folder_path = args.save_path / 'Train'
-    os.makedirs(folder_path, exist_ok=True)
-        
-    print('Saving training patches...')
-    for i, patch in enumerate(tqdm(patches_filt)):
-        np.save(os.path.join(folder_path, f'patch_trimester_{i}.npy'), patch)
+    save_patches(patches_filt, 'Train', args.save_path)
         
     ## Preprocess Validation images
     print('\nStarting preprocess in validation...')
     patches_filt = preprocess_patches(img_val, args.patch_size, train_stride)
     
-    folder_path = args.save_path / 'Val'
-    os.makedirs(folder_path, exist_ok=True)
+    save_patches(patches_filt, 'Val', args.save_path)
         
-    print('Saving validation patches...')
-    for i, patch in enumerate(tqdm(patches_filt)):
-        np.save(os.path.join(folder_path, f'patch_trimester_{i}.npy'), patch)
-        
-    ## Preprocess test images
+    ## Preprocess Test images
     print('\nStarting preprocess in testing...')
     # 0-12->2020, 13-22->2021, 23-36-> 2022
-    img_test = load_tif_image(args.test_path)
+    img_test = img_test[args.test_fill:, :, :]
     print(f'Img test shape: {img_test.shape}')
     
     # img_test = img_test + mask
@@ -155,15 +166,11 @@ if __name__== '__main__':
         img_test[i, :, :][mask == 2.0] = 2.0
     
     print('Extracting patches...')
+    # For Test set we extract images with no overlap and with all kinds deforestation percentage
     patches_test = extract_patches(img_test, patch_size=args.patch_size, stride=args.patch_size).reshape((-1, 3, int(img_test.shape[0]/3), args.patch_size, args.patch_size))
     print(f'Patches extracted: {patches_test.shape}')
     
-    folder_path = args.save_path / 'Test'
-    os.makedirs(folder_path, exist_ok=True)
-        
-    print('Saving testing patches...')
-    for i, patch in enumerate(tqdm(patches_test)):
-        np.save(os.path.join(folder_path, f'patch_trimester_{i}.npy'), patch)
+    save_patches(patches_test, 'Test', args.save_path)
     
 
 

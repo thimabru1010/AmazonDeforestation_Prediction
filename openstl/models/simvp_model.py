@@ -31,6 +31,9 @@ class SimVP_Model(nn.Module):
             self.hid = MidMetaNet(T*hid_S, hid_T, N_T,
                 input_resolution=(H, W), model_type=model_type,
                 mlp_ratio=mlp_ratio, drop=drop, drop_path=drop_path)
+            
+        #!ALTERADO
+        # self.classif_head = 
 
     def forward(self, x_raw, **kwargs):
         B, T, C, H, W = x_raw.shape
@@ -44,7 +47,12 @@ class SimVP_Model(nn.Module):
         hid = hid.reshape(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)
+        #! ALTERADO
+        print('DEBUG 1')
+        print(Y.shape)
         Y = Y.reshape(B, T, C, H, W)
+        print(Y.shape)
+        # 1/0
 
         return Y
 

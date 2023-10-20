@@ -348,6 +348,7 @@ class BaseExperiment(object):
         self.call_hook('before_val_epoch')
         results = self.method.test_one_epoch(self, self.test_loader)
         self.call_hook('after_val_epoch')
+        # print(results)
 
         if 'weather' in self.args.dataname:
             metric_list, spatial_norm = self.args.metrics, True

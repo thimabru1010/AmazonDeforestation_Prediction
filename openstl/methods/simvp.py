@@ -31,8 +31,16 @@ class SimVP(Base_method):
         if self.args.aft_seq_length == self.args.pre_seq_length:
             pred_y = self.model(batch_x)
         elif self.args.aft_seq_length < self.args.pre_seq_length:
+            #! ALTERADO
             pred_y = self.model(batch_x)
-            pred_y = pred_y[:, :self.args.aft_seq_length]
+            print('DEBUG 2')
+            print(pred_y.shape)
+            #! As outras camadas são jogadas fora, pois só temos labels para o número de aft_seq_length.
+            #! Sendo assim, ao aplicar a função de custo e o backpropagation o modelo irá aprender a gerar o tensor pred_y
+            #! Com os valores corretos para o canal self.args.aft_seq_length.
+            pred_y = pred_y[:, :self.args.aft_seq_length] 
+            print(pred_y.shape)
+            print(pred_y)
         elif self.args.aft_seq_length > self.args.pre_seq_length:
             pred_y = []
             d = self.args.aft_seq_length // self.args.pre_seq_length
@@ -45,7 +53,7 @@ class SimVP(Base_method):
 
             if m != 0:
                 cur_seq = self.model(cur_seq)
-                pred_y.append(cur_seq[:, :m])
+                pred_y.append(cur_seq[:, :m]) #???
             
             pred_y = torch.cat(pred_y, dim=1)
         return pred_y
@@ -70,6 +78,11 @@ class SimVP(Base_method):
 
             with self.amp_autocast():
                 pred_y = self._predict(batch_x)
+                #! ALTERADO
+                print('DEBUG')
+                print(pred_y.shape)
+                print(batch_y.shape)
+                1/0
                 loss = self.criterion(pred_y, batch_y)
 
             if not self.dist:

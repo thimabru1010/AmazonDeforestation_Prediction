@@ -14,7 +14,7 @@ def create_parser():
     parser.add_argument('--display_step', default=10, type=int,
                         help='Interval in batches between display of training metrics')
     parser.add_argument('--res_dir', default='work_dirs', type=str)
-    parser.add_argument('--ex_name', '-ex', default='Debug', type=str)
+    parser.add_argument('--ex_name', '-ex', default='exp1', type=str)
     parser.add_argument('--use_gpu', default=True, type=bool)
     parser.add_argument('--fp16', action='store_true', default=False,
                         help='Whether to use Native AMP for mixed precision training (PyTorch=>1.6.0)')
