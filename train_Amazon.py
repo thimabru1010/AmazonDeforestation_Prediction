@@ -69,7 +69,7 @@ for attribute in default_values.keys():
     if config[attribute] is None:
         config[attribute] = default_values[attribute]
 
-exp = BaseExperiment(args, dataloaders=(dataloader_train, dataloader_val, dataloader_test))
+exp = BaseExperiment(args, dataloaders=(dataloader_train, dataloader_val, dataloader_test), nclasses=3)
 
 print('>'*35 + ' training ' + '<'*35)
 exp.train()

@@ -13,6 +13,9 @@ except:
 def rescale(x):
     return (x - x.max()) / (x.max() - x.min()) * 2 - 1
 
+#TODO: Create Classification Metrics
+def ACC():
+    pass
 
 def MAE(pred, true, spatial_norm=False):
     if not spatial_norm:
@@ -113,6 +116,7 @@ class LPIPS(torch.nn.Module):
 def metric(pred, true, mean=None, std=None, metrics=['mae', 'mse'],
            clip_range=[0, 1], channel_names=None,
            spatial_norm=False, return_log=True):
+    #TODO: Create Classification metrics
     """The evaluation function to output metrics.
 
     Args:

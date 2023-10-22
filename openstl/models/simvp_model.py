@@ -16,13 +16,17 @@ class SimVP_Model(nn.Module):
 
     def __init__(self, in_shape, hid_S=16, hid_T=256, N_S=4, N_T=4, model_type='gSTA',
                  mlp_ratio=8., drop=0.0, drop_path=0.0, spatio_kernel_enc=3,
-                 spatio_kernel_dec=3, act_inplace=True, **kwargs):
+                 spatio_kernel_dec=3, act_inplace=True, nclasses=None, **kwargs):
         super(SimVP_Model, self).__init__()
         T, C, H, W = in_shape  # T is pre_seq_length
         H, W = int(H / 2**(N_S/2)), int(W / 2**(N_S/2))  # downsample 1 / 2**(N_S/2)
         act_inplace = False
         self.enc = Encoder(C, hid_S, N_S, spatio_kernel_enc, act_inplace=act_inplace)
-        self.dec = Decoder(hid_S, C, N_S, spatio_kernel_dec, act_inplace=act_inplace)
+        #! Alterado
+        if nclasses:
+            self.dec = Decoder(hid_S, nclasses*C, N_S, spatio_kernel_dec, act_inplace=act_inplace)
+        else:
+            self.dec = Decoder(hid_S, C, N_S, spatio_kernel_dec, act_inplace=act_inplace)
 
         model_type = 'gsta' if model_type is None else model_type.lower()
         if model_type == 'incepu':
@@ -31,9 +35,6 @@ class SimVP_Model(nn.Module):
             self.hid = MidMetaNet(T*hid_S, hid_T, N_T,
                 input_resolution=(H, W), model_type=model_type,
                 mlp_ratio=mlp_ratio, drop=drop, drop_path=drop_path)
-            
-        #!ALTERADO
-        # self.classif_head = 
 
     def forward(self, x_raw, **kwargs):
         B, T, C, H, W = x_raw.shape
@@ -48,12 +49,10 @@ class SimVP_Model(nn.Module):
 
         Y = self.dec(hid, skip)
         #! ALTERADO
-        print('DEBUG 1')
-        print(Y.shape)
-        Y = Y.reshape(B, T, C, H, W)
-        print(Y.shape)
-        # 1/0
-
+        # print('DEBUG SimVP_Model Forward')
+        # print(Y.shape)
+        Y = Y.reshape(B, T, -1, H, W)
+        # print(Y.shape)
         return Y
 
 
@@ -96,6 +95,7 @@ class Decoder(nn.Module):
               ConvSC(C_hid, C_hid, spatio_kernel, upsampling=samplings[-1],
                      act_inplace=act_inplace)
         )
+        
         self.readout = nn.Conv2d(C_hid, C_out, 1)
 
     def forward(self, hid, enc1=None):
@@ -103,6 +103,9 @@ class Decoder(nn.Module):
             hid = self.dec[i](hid)
         Y = self.dec[-1](hid + enc1)
         Y = self.readout(Y)
+        # print('DEBUG forward')
+        # print(Y.shape)
+        # 1/0
         return Y
 
 

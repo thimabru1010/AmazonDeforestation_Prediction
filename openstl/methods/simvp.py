@@ -17,30 +17,39 @@ class SimVP(Base_method):
 
     """
 
-    def __init__(self, args, device, steps_per_epoch):
+    def __init__(self, args, device, steps_per_epoch, nclasses):
+        #TODO put ignore index and weights of Cross Entropy into constructor arguments
         Base_method.__init__(self, args, device, steps_per_epoch)
+        self.nclasses = nclasses
         self.model = self._build_model(self.config)
         self.model_optim, self.scheduler, self.by_epoch = self._init_optimizer(steps_per_epoch)
-        self.criterion = nn.MSELoss()
-
+        if nclasses is not None:
+            self.criterion = nn.CrossEntropyLoss(ignore_index=2)
+        else:
+            self.criterion = nn.MSELoss()
+        
     def _build_model(self, args):
-        return SimVP_Model(**args).to(self.device)
+        return SimVP_Model(nclasses=self.nclasses, **args).to(self.device)
 
-    def _predict(self, batch_x, batch_y=None, **kwargs):
+    def _predict(self, batch_x, batch_y=None, classify=True, **kwargs):
         """Forward the model"""
+        # if classify:
+        #     pred_y = self.model(batch_x)
+        #     # print('DEBUG _predict')
+        #     # print(pred_y.shape)
+        #     # 1/0
+        # else:
         if self.args.aft_seq_length == self.args.pre_seq_length:
             pred_y = self.model(batch_x)
         elif self.args.aft_seq_length < self.args.pre_seq_length:
             #! ALTERADO
             pred_y = self.model(batch_x)
-            print('DEBUG 2')
-            print(pred_y.shape)
+            # print('DEBUG 2')
+            # print(pred_y.shape)
             #! As outras camadas são jogadas fora, pois só temos labels para o número de aft_seq_length.
             #! Sendo assim, ao aplicar a função de custo e o backpropagation o modelo irá aprender a gerar o tensor pred_y
             #! Com os valores corretos para o canal self.args.aft_seq_length.
             pred_y = pred_y[:, :self.args.aft_seq_length] 
-            print(pred_y.shape)
-            print(pred_y)
         elif self.args.aft_seq_length > self.args.pre_seq_length:
             pred_y = []
             d = self.args.aft_seq_length // self.args.pre_seq_length
@@ -79,11 +88,25 @@ class SimVP(Base_method):
             with self.amp_autocast():
                 pred_y = self._predict(batch_x)
                 #! ALTERADO
-                print('DEBUG')
-                print(pred_y.shape)
-                print(batch_y.shape)
-                1/0
-                loss = self.criterion(pred_y, batch_y)
+                B, T, C, H, W = pred_y.shape
+                # print('DEBUG train_one_epoch')
+                # print(B, T, C, H, W )
+                # print(pred_y.shape, pred_y.dtype) # Pred = torch.Size([32, 1, 4, 3, 64, 64])
+                # print(batch_y.shape, batch_y.dtype) # Label = torch.Size([32, 1, 3, 64, 64])
+                # print(pred_y.reshape(B, -1, H, W).shape)
+                # print(batch_y.reshape(B, -1, H, W).shape)
+                # print(batch_y)
+                # loss = self.criterion(pred_y, batch_y)
+                pred_y = pred_y.reshape(B, -1, H, W)
+                batch_y = batch_y.reshape(B, -1, H, W)
+                loss = 0
+                for deep_slice in range(self.nclasses):
+                    # print(deep_slice, pred_y[:, deep_slice:deep_slice+3].shape, batch_y[:, deep_slice].shape)
+                    # print(pred_y.device, batch_y.type(torch.LongTensor).device)
+                    # loss += self.criterion(pred_y[:, deep_slice], batch_y[:, deep_slice])
+                    loss += self.criterion(pred_y[:, deep_slice:deep_slice+3], batch_y[:, deep_slice].type(torch.cuda.LongTensor))
+                loss /= C
+                # loss = self.criterion(pred_y.reshape(B, -1, H, W), batch_y.reshape(B, -1, H, W))
 
             if not self.dist:
                 losses_m.update(loss.item(), batch_x.size(0))

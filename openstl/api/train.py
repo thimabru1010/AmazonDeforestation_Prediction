@@ -28,7 +28,7 @@ except ImportError:
 class BaseExperiment(object):
     """The basic class of PyTorch training and evaluation."""
 
-    def __init__(self, args, dataloaders=None):
+    def __init__(self, args, nclasses=None, dataloaders=None):
         """Initialize experiments (non-dist as an example)"""
         self.args = args
         self.config = self.args.__dict__
@@ -45,6 +45,8 @@ class BaseExperiment(object):
         self._world_size = 1
         self._dist = self.args.dist
         self._early_stop = self.args.early_stop_epoch
+        #! Alterado
+        self.nclasses = nclasses
 
         self._preparation(dataloaders)
         if self._rank == 0:
@@ -143,8 +145,10 @@ class BaseExperiment(object):
         self.call_hook('before_run')
 
     def _build_method(self):
+        #! Cria o modelo
         self.steps_per_epoch = len(self.train_loader)
-        self.method = method_maps[self.args.method](self.args, self.device, self.steps_per_epoch)
+        # print('DEBUG _build_method')
+        self.method = method_maps[self.args.method](self.args, self.device, self.steps_per_epoch, nclasses=self.nclasses)
         self.method.model.eval()
         # setup ddp training
         if self._dist:
