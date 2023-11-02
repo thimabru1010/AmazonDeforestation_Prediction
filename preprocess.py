@@ -70,7 +70,7 @@ def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, wi
     os.makedirs(folder_path_labels, exist_ok=True)
 
     total_iterations = patches.shape[0] * (patches.shape[1] - window_size + 1)
-    with tqdm(total=total_iterations, desc='Saving Patches') as pbar:
+    with tqdm(total=total_iterations, desc=f'{modality}:Saving Patches') as pbar:
         for i, patch in enumerate(patches):
             # print(patch.shape)
             for j in range(patch.shape[0] - window_size + 1):
@@ -145,10 +145,6 @@ if __name__== '__main__':
     img_train = img_train[:, :height_cut, :width_cut]
     mask = mask[:height_cut, :width_cut]
     img_test = img_test[:, :height_cut, :width_cut]
-    
-    print(f'Img train shape: {img_train.shape}')
-    print(f'Amazon mask shape shape: {img_train.shape}')
-    print(f'Img test shape: {img_test.shape}')
 
     mask[mask == 0.0] = 2.0
     mask[mask == 1] = 0.0
@@ -157,14 +153,21 @@ if __name__== '__main__':
     
     # 8-12 tri->2019 + 0 tri -> 2020
     # img_val = np.concatenate((img_train[24:36, :, :], img_test[:args.test_fill, :, :]), axis=0)
-    img_val = np.concatenate((img_train[9:, :, :], img_test[:args.test_fill, :, :]), axis=0)
+    img_val = np.concatenate((img_train[8:, :, :], img_test[:args.test_fill, :, :]), axis=0)
     # 0-4 tri->2017, 4-8 tri->2018
-    img_train = img_train[:9, :, :]
+    img_train = img_train[:8, :, :]
+    
+    print(f'Img train shape: {img_train.shape}')
+    print(f'Img val shape: {img_val.shape}')
+    print(f'Amazon mask shape shape: {mask.shape}')
+    # print(f'Img test shape: {img_test.shape}')
 
     # Preprocessing
     print('Starting preprocess in training...')
     train_stride = int((1-args.overlap)*args.patch_size)
     patches_filt = preprocess_patches(img_train, args.patch_size, train_stride)
+
+    print(patches_filt.shape)
 
     save_patches(patches_filt, 'Train', args.save_path)
         
