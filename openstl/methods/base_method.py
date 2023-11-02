@@ -49,7 +49,12 @@ class Base_method(object):
         self.amp_autocast = suppress  # do nothing
         self.loss_scaler = None
         # setup metrics
-        if 'weather' in self.args.dataname:
+        # print('DEBUG Base_method __init__')
+        # print(self.args.dataname)
+        # 1/0
+        if 'custom' in self.args.dataname:
+            self.metric_list, self.spatial_norm = ['acc'], False
+        elif 'weather' in self.args.dataname:
             self.metric_list, self.spatial_norm = ['mse', 'rmse', 'mae'], True
         else:
             self.metric_list, self.spatial_norm = ['mse', 'mae'], False
@@ -143,7 +148,7 @@ class Base_method(object):
             results_all[k] = results_strip
         return results_all
 
-    def _nondist_forward_collect(self, data_loader, length=None, gather_data=False):
+    def _nondist_forward_collect(self, data_loader, length=None, gather_data=False, classify=False):
         """Forward and collect predictios.
 
         Args:
@@ -169,10 +174,24 @@ class Base_method(object):
                 results.append(dict(zip(['inputs', 'preds', 'trues'],
                                         [batch_x.cpu().numpy(), pred_y.cpu().numpy(), batch_y.cpu().numpy()])))
             else:  # return metrics
+                # print('DEBUG _nondist_forward_collect')
+                # print(self.metric_list)
+                # 1/0
                 eval_res, _ = metric(pred_y.cpu().numpy(), batch_y.cpu().numpy(),
                                      data_loader.dataset.mean, data_loader.dataset.std,
                                      metrics=self.metric_list, spatial_norm=self.spatial_norm, return_log=False)
-                eval_res['loss'] = self.criterion(pred_y, batch_y).cpu().numpy()
+                #!Alterado
+                B, T, C, H, W = pred_y.shape
+                pred_y = pred_y.reshape(B, -1, H, W)
+                batch_y = batch_y.reshape(B, -1, H, W)
+                if classify:
+                    loss = 0
+                    window_size = batch_y.shape[1]
+                    for deep_slice in range(self.nclasses):
+                        loss += self.criterion(pred_y[:, deep_slice*window_size:(deep_slice+1)*window_size], batch_y[:, deep_slice].type(torch.cuda.LongTensor))
+                    eval_res['loss'] = loss.cpu() / self.nclasses
+                else:
+                    eval_res['loss'] = self.criterion(pred_y, batch_y).cpu().numpy()
                 for k in eval_res.keys():
                     eval_res[k] = eval_res[k].reshape(1)
                 results.append(eval_res)
@@ -202,7 +221,9 @@ class Base_method(object):
         if self.dist and self.world_size > 1:
             results = self._dist_forward_collect(vali_loader, len(vali_loader.dataset), gather_data=False)
         else:
-            results = self._nondist_forward_collect(vali_loader, len(vali_loader.dataset), gather_data=False)
+            #! Alterado: Novo parametro classify
+            #TODO: Passar essa flag para o parser no inicio do programa
+            results = self._nondist_forward_collect(vali_loader, len(vali_loader.dataset), gather_data=False, classify=True)
 
         eval_log = ""
         for k, v in results.items():

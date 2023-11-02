@@ -35,10 +35,12 @@ class SimVP(Base_method):
         """Forward the model"""
         # if classify:
         #     pred_y = self.model(batch_x)
-        #     # print('DEBUG _predict')
-        #     # print(pred_y.shape)
-        #     # 1/0
-        # else:
+        #     preds = []
+        #     for i in range(true.shape[2]):
+        #         preds.append(np.argmax(pred[:, :, i:i+true.shape[2]], axis=2))
+        #     # pred = np.argmax(pred, axis=2)
+        #     pred = np.stack(preds, axis=2).reshape(-1)
+
         if self.args.aft_seq_length == self.args.pre_seq_length:
             pred_y = self.model(batch_x)
         elif self.args.aft_seq_length < self.args.pre_seq_length:
@@ -89,23 +91,13 @@ class SimVP(Base_method):
                 pred_y = self._predict(batch_x)
                 #! ALTERADO
                 B, T, C, H, W = pred_y.shape
-                # print('DEBUG train_one_epoch')
-                # print(B, T, C, H, W )
-                # print(pred_y.shape, pred_y.dtype) # Pred = torch.Size([32, 1, 4, 3, 64, 64])
-                # print(batch_y.shape, batch_y.dtype) # Label = torch.Size([32, 1, 3, 64, 64])
-                # print(pred_y.reshape(B, -1, H, W).shape)
-                # print(batch_y.reshape(B, -1, H, W).shape)
-                # print(batch_y)
-                # loss = self.criterion(pred_y, batch_y)
                 pred_y = pred_y.reshape(B, -1, H, W)
                 batch_y = batch_y.reshape(B, -1, H, W)
                 loss = 0
+                window_size = batch_y.shape[1]
                 for deep_slice in range(self.nclasses):
-                    # print(deep_slice, pred_y[:, deep_slice:deep_slice+3].shape, batch_y[:, deep_slice].shape)
-                    # print(pred_y.device, batch_y.type(torch.LongTensor).device)
-                    # loss += self.criterion(pred_y[:, deep_slice], batch_y[:, deep_slice])
-                    loss += self.criterion(pred_y[:, deep_slice:deep_slice+3], batch_y[:, deep_slice].type(torch.cuda.LongTensor))
-                loss /= C
+                    loss += self.criterion(pred_y[:, deep_slice*window_size:(deep_slice+1)*window_size], batch_y[:, deep_slice].type(torch.cuda.LongTensor))
+                # loss /= self.nclasses
                 # loss = self.criterion(pred_y.reshape(B, -1, H, W), batch_y.reshape(B, -1, H, W))
 
             if not self.dist:

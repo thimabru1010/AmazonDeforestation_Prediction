@@ -14,8 +14,45 @@ def rescale(x):
     return (x - x.max()) / (x.max() - x.min()) * 2 - 1
 
 #TODO: Create Classification Metrics
-def ACC():
-    pass
+def pred_months_argmax(pred, c_months, num_classes):
+    preds = []
+    for i in range(c_months):
+        preds.append(np.argmax(pred[:, :, i*num_classes:(i+1)*num_classes], axis=2))
+    return np.stack(preds, axis=2).reshape(-1)
+
+def confusion_matrix(true, pred, num_classes=3):
+    # Inicialize uma matriz de confusão (confusion matrix) como uma matriz zeros 3x3
+    confusion_matrix = np.zeros((num_classes, num_classes), dtype=int)
+
+    # Preencha a matriz de confusão
+    for i in range(num_classes):
+        for j in range(num_classes):
+            confusion_matrix[i, j] = np.sum((true == i) & (pred == j))
+    return confusion_matrix
+
+def Recall(pred, true):
+    pred = pred_months_argmax(pred, true.shape[2], true.shape[2])
+    true = true.reshape(-1)
+    cm = confusion_matrix(true, pred)
+    print()
+    print(pred.shape)
+    print(cm)
+    1/0
+    intersect = np.sum(pred*true)
+    total_pixel_truth = np.sum(true)
+    return np.mean(intersect/total_pixel_truth)
+
+def Precision(pred, true):
+    pred = pred_months_argmax(pred, true.shape[2], true.shape[2])
+    true = true.reshape(-1)
+    intersect = np.sum(pred*true)
+    total_pixel_pred = np.sum(pred)
+    return np.mean(intersect/total_pixel_pred)
+
+def ACC(pred, true):
+    pred = pred_months_argmax(pred, true.shape[2], true.shape[2])
+    true = true.reshape(-1)
+    return np.mean(pred == true)
 
 def MAE(pred, true, spatial_norm=False):
     if not spatial_norm:
@@ -116,7 +153,6 @@ class LPIPS(torch.nn.Module):
 def metric(pred, true, mean=None, std=None, metrics=['mae', 'mse'],
            clip_range=[0, 1], channel_names=None,
            spatial_norm=False, return_log=True):
-    #TODO: Create Classification metrics
     """The evaluation function to output metrics.
 
     Args:
@@ -138,7 +174,7 @@ def metric(pred, true, mean=None, std=None, metrics=['mae', 'mse'],
         true = true * std + mean
     eval_res = {}
     eval_log = ""
-    allowed_metrics = ['mae', 'mse', 'rmse', 'ssim', 'psnr', 'snr', 'lpips']
+    allowed_metrics = ['Precision', 'Recall', 'acc', 'mae', 'mse', 'rmse', 'ssim', 'psnr', 'snr', 'lpips']
     invalid_metrics = set(metrics) - set(allowed_metrics)
     if len(invalid_metrics) != 0:
         raise ValueError(f'metric {invalid_metrics} is not supported.')
@@ -149,6 +185,24 @@ def metric(pred, true, mean=None, std=None, metrics=['mae', 'mse'],
     else:
         channel_names, c_group, c_width = None, None, None
 
+    #TODO: Create Classification metrics
+    if 'Recall' in metrics:
+        eval_res['Recall'] = Recall(pred, true)
+        
+    if 'Precision' in metrics:
+        eval_res['Precision'] = Precision(pred, true)
+            
+    if 'acc' in metrics:
+        eval_res['acc'] = ACC(pred, true)
+        # if channel_names is None:
+        # else:
+        #     acc_sum = 0.
+        #     for i, c_name in enumerate(channel_names):
+        #         eval_res[f'acc_{str(c_name)}'] = ACC(pred[:, :, i*c_width: (i+1)*c_width, ...],
+        #                                              true[:, :, i*c_width: (i+1)*c_width, ...])
+        #         acc_sum += eval_res[f'acc_{str(c_name)}']
+        #     eval_res['acc'] = acc_sum / c_group
+            
     if 'mse' in metrics:
         if channel_names is None:
             eval_res['mse'] = MSE(pred, true, spatial_norm)

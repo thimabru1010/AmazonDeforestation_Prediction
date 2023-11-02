@@ -330,7 +330,7 @@ class BaseExperiment(object):
         time.sleep(1)  # wait for some hooks like loggers to finish
         self.call_hook('after_run')
 
-    def vali(self):
+    def vali(self, classify=True):
         """A validation loop during training"""
         self.call_hook('before_val_epoch')
         results, eval_log = self.method.vali_one_epoch(self, self.vali_loader)
@@ -339,11 +339,14 @@ class BaseExperiment(object):
         if self._rank == 0:
             print_log('val\t '+eval_log)
             if has_nni:
-                nni.report_intermediate_result(results['mse'].mean())
+                if classify:
+                    nni.report_intermediate_result(results['acc'].mean())
+                else:
+                    nni.report_intermediate_result(results['mse'].mean())
 
         return results['loss'].mean()
 
-    def test(self):
+    def test(self, classify=True):
         """A testing loop of STL methods"""
         if self.args.test:
             best_model_path = osp.join(self.path, 'checkpoint.pth')
@@ -362,7 +365,15 @@ class BaseExperiment(object):
         eval_res, eval_log = metric(results['preds'], results['trues'],
                                     self.test_loader.dataset.mean, self.test_loader.dataset.std,
                                     metrics=metric_list, channel_names=channel_names, spatial_norm=spatial_norm)
-        results['metrics'] = np.array([eval_res['mae'], eval_res['mse']])
+        res_metrics = []
+        for _metric in metric_list:
+            res_metrics.append(eval_res[_metric])
+        results['metrics'] = np.array(res_metrics)
+        
+        # if classify:
+        #     results['metrics'] = np.array([eval_res['acc'], eval_res['Precision']])
+        # else:
+        #     results['metrics'] = np.array([eval_res['mae'], eval_res['mse']])
 
         if self._rank == 0:
             print_log(eval_log)
@@ -372,4 +383,4 @@ class BaseExperiment(object):
             for np_data in ['metrics', 'inputs', 'trues', 'preds']:
                 np.save(osp.join(folder_path, np_data + '.npy'), results[np_data])
 
-        return eval_res['mse']
+        return eval_res['acc']

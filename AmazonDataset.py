@@ -4,13 +4,27 @@ from torch.utils.data import Dataset
 import torch.nn.functional as F
 import os
 import numpy as np
-import pathlib
+from pathlib import Path
 
 class CustomDataset(Dataset):
-    def __init__(self, root_dir: pathlib.Path, normalize: bool=False, transform: torchvision.transforms=None):
+    def read_sorted_paths(self, root_dir, num_windows=7):
+        filenames = []
+        for i in range(len(os.listdir(root_dir)) // num_windows):
+            for j in range(num_windows):
+                filename = Path(f'patch={i}_trimester_window={j}.npy')
+                filenames.append(filename)
+        return filenames
+    
+    def __init__(self, root_dir: Path, normalize: bool=False, transform: torchvision.transforms=None,
+                 Debug: bool=False, Test: bool=False):
         super(CustomDataset, self).__init__()
         self.root_dir = root_dir
-        self.data_files = os.listdir(root_dir)
+        if Test:
+            self.data_files = self.read_sorted_paths(self.root_dir)
+        else:
+            self.data_files = os.listdir(root_dir)
+        if Debug:
+            self.data_files = self.data_files[:20]
         self.mean = None
         self.std = None
         self.normalize = normalize
@@ -30,11 +44,11 @@ class CustomDataset(Dataset):
         return len(self.data_files)
 
     def __getitem__(self, index):
+        # print(self.root_dir / self.data_files[index])
         patch_window = np.load(self.root_dir / self.data_files[index])
         
-        # data = torch.tensor(patch_window[:, :-1].reshape(-1, patch_window.shape[2], patch_window.shape[2])).float().unsqueeze(1)
-        data = torch.tensor(patch_window[:, :-1]).float().transpose(1, 0)
-        labels = torch.tensor(patch_window[:, -1]).float().unsqueeze(1).transpose(1, 0)
+        data = torch.tensor(patch_window[:-1]).float().transpose(1, 0)
+        labels = torch.tensor(patch_window[-1]).float().unsqueeze(1).transpose(1, 0)
         
         # Apply min-max normalization
         #! Since Data is categorical 0, 1 and 2 min-max normalization in simply dividing by 2.
