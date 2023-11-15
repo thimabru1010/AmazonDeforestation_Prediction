@@ -192,49 +192,6 @@ if __name__== '__main__':
     patches_filt = preprocess_patches(img_val, args.patch_size, train_stride)
     
     save_patches(patches_filt, 'Val', args.save_path)
-        
-    ## Preprocess Test images
-    # print('\nStarting preprocess in testing...')
-    # # 0-12->2020, 13-22->2021, 23-36-> 2022
-    # img_test = img_test[args.test_fill:, :, :]
-    # print(f'Img test shape: {img_test.shape}')
-    
-    # # img_test = img_test + mask
-    # # for i in range(img_test.shape[0]):
-    # #     img_test[i, :, :][mask == 2.0] = 2.0
-    
-    # #TODO: Extrair os patches de maneira ordenada do dataset de Test
-    # print('Extracting patches...')
-    # # For Test set we extract images with no overlap and with all kinds deforestation percentage
-    # patches_test = extract_patches(img_test, patch_size=args.patch_size, stride=args.patch_size).reshape((-1, img_test.shape[0], args.patch_size, args.patch_size))
-    # print(f'Patches extracted: {patches_test.shape}')
-    
-    # save_patches(patches_test, 'Test', args.save_path)
-    
-    # def extract_patches_test(binary_img_test_ref, patch_size):
-    # # Extract training patches
-    # stride = patch_size
-
-    # height, width = binary_img_test_ref.shape
-    # #print(height, width)
-
-    # num_patches_h = int(height / stride)
-    # num_patches_w = int(width / stride)
-    # #print(num_patches_h, num_patches_w)
-
-    # new_shape = (num_patches_h*num_patches_w, patch_size, patch_size)
-    # new_img_ref = np.zeros(new_shape)
-    # print(new_img_ref.shape)
-    # cont = 0
-    # # rows
-    # for h in range(num_patches_h):
-    #     #columns
-    #     for w in range(num_patches_w):
-    #         new_img_ref[cont] = binary_img_test_ref[h*stride:(h+1)*stride, w*stride:(w+1)*stride]
-    #         cont += 1
-    # #print(cont)
-
-    # return new_img_ref
     
 
 
