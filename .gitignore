@@ -138,3 +138,6 @@ configs_test/
 api/test.py
 configs/kinetics/simvp
 configs/bair/simvp
+
+# Folders
+data

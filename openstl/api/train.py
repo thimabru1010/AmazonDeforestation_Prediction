@@ -11,6 +11,7 @@ from fvcore.nn import FlopCountAnalysis, flop_count_table
 
 import torch
 import torch.distributed as dist
+# import torch.nn.functional as F
 
 from openstl.core import Hook, metric, Recorder, get_priority, hook_maps
 from openstl.methods import method_maps
@@ -91,8 +92,10 @@ class BaseExperiment(object):
             # re-set gpu_ids with distributed training mode
             self._gpu_ids = range(self._world_size)
         self.device = self._acquire_device()
-        if self._early_stop <= self._max_epochs // 5:
-            self._early_stop = self._max_epochs * 2
+        self._early_stop = self.args.early_stop_epoch
+        #! Alterado. Época Grande demais
+        # if self._early_stop <= self._max_epochs // 5:
+        #     self._early_stop = self._max_epochs * 2
 
         # log and checkpoint
         base_dir = self.args.res_dir if self.args.res_dir is not None else 'work_dirs'
@@ -293,10 +296,14 @@ class BaseExperiment(object):
 
     def train(self):
         """Training loops of STL methods"""
-        recorder = Recorder(verbose=True, early_stop_time=min(self._max_epochs // 10, 10))
+        # recorder = Recorder(verbose=True, early_stop_time=min(self._max_epochs // 10, 10))
+        recorder = Recorder(verbose=True, early_stop_time=10)
         num_updates = self._epoch * self.steps_per_epoch
         early_stop = False
         self.call_hook('before_train_epoch')
+        
+        print('DEBUG EARLY STOPPING')
+        print(self._early_stop, early_stop, self._max_epochs)
 
         eta = 1.0  # PredRNN variants
         for epoch in range(self._epoch, self._max_epochs):
@@ -313,6 +320,7 @@ class BaseExperiment(object):
                 with torch.no_grad():
                     vali_loss = self.vali()
 
+                #TODO: Printar na tela os f1 score do Treino
                 if self._rank == 0:
                     print_log('Epoch: {0}, Steps: {1} | Lr: {2:.7f} | Train Loss: {3:.7f} | Vali Loss: {4:.7f}\n'.format(
                         epoch + 1, len(self.train_loader), cur_lr, loss_mean.avg, vali_loss))
@@ -337,10 +345,10 @@ class BaseExperiment(object):
         self.call_hook('after_val_epoch')
 
         if self._rank == 0:
-            print_log('val\t '+eval_log)
+            print_log('\nval\t '+eval_log)
             if has_nni:
                 if classify:
-                    nni.report_intermediate_result(results['acc'].mean())
+                    nni.report_intermediate_result(results['F1-Score_1'].mean())
                 else:
                     nni.report_intermediate_result(results['mse'].mean())
 
@@ -356,6 +364,9 @@ class BaseExperiment(object):
         results = self.method.test_one_epoch(self, self.test_loader)
         self.call_hook('after_val_epoch')
         # print(results)
+        
+        # if classify:
+        #     results['preds'] = F.log_softmax(results['preds'])
 
         if 'weather' in self.args.dataname:
             metric_list, spatial_norm = self.args.metrics, True
@@ -364,10 +375,19 @@ class BaseExperiment(object):
             metric_list, spatial_norm, channel_names = self.args.metrics, False, None
         eval_res, eval_log = metric(results['preds'], results['trues'],
                                     self.test_loader.dataset.mean, self.test_loader.dataset.std,
-                                    metrics=metric_list, channel_names=channel_names, spatial_norm=spatial_norm)
+                                    metrics=metric_list, channel_names=channel_names, spatial_norm=spatial_norm, test_time=True)
         res_metrics = []
+        print(eval_res)
         for _metric in metric_list:
-            res_metrics.append(eval_res[_metric])
+            print(_metric)
+            if _metric == 'f1_score':
+                if type(eval_res['F1-Score_1']) is np.ndarray:
+                    eval_res['F1-Score_1'] = eval_res['F1-Score_1'].item()
+                res_metrics.append(eval_res['F1-Score_0'])
+                res_metrics.append(eval_res['F1-Score_1'])
+            else:
+                res_metrics.append(eval_res[_metric])
+        print(res_metrics)
         results['metrics'] = np.array(res_metrics)
         
         # if classify:

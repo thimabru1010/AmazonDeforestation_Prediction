@@ -55,12 +55,13 @@ def preprocess_patches(img_train: np.ndarray, patch_size: int, overlap_stride: i
     # Filter deforestation
     #! Here we are eliminating the patches along all temporal axis 
     #! if their sum along the months isn't above the threshold
-    print('Filtering no deforestation patches...')
-    print(patches.shape)
-    keep_patches = np.mean((patches == 1), axis=(1, 2, 3)) > args.min_def
-    patches_filt = patches[keep_patches]
-    print(f'Patches filtered: {patches_filt.shape}')
-    return patches_filt
+    # print('Filtering no deforestation patches...')
+    # print(patches.shape)
+    # keep_patches = np.mean((patches == 1), axis=(1, 2, 3)) > args.min_def
+    # patches_filt = patches[keep_patches]
+    # print(f'Patches filtered: {patches_filt.shape}')
+    # return patches_filt
+    return patches
     
 def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, window_size: int=5, window_stride: int=1):
     folder_path = save_path / modality
@@ -69,6 +70,10 @@ def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, wi
     os.makedirs(folder_path_input, exist_ok=True)
     os.makedirs(folder_path_labels, exist_ok=True)
 
+    saved_count = 0
+    skipped_count = 0
+    def_count = 0
+    no_def_count = 0
     total_iterations = patches.shape[0] * (patches.shape[1] - window_size + 1)
     with tqdm(total=total_iterations, desc=f'{modality}:Saving Patches') as pbar:
         for i, patch in enumerate(patches):
@@ -80,10 +85,22 @@ def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, wi
                 input_windowed_patch = windowed_patch[:-1]
                 input_windowed_patch[input_windowed_patch == 2] = 0
                 labels_windowed_patch = windowed_patch[-1]
+                if np.mean(labels_windowed_patch == 1, axis=(0, 1)) < args.min_def:
+                    skipped_count += 1
+                    pbar.update(1)
+                    continue
+                def_count += np.sum(labels_windowed_patch == 1)
+                no_def_count += np.sum(labels_windowed_patch == 0)
                 # print(input_windowed_patch.shape, labels_windowed_patch.shape)
                 np.save(os.path.join(folder_path_input, f'patch={i}_trimester_window={j}.npy'), input_windowed_patch)
                 np.save(os.path.join(folder_path_labels, f'patch={i}_trimester_window={j}.npy'), labels_windowed_patch)
+                saved_count += 1
                 pbar.update(1)
+    print(f'{saved_count} Saved Images')
+    print(f'{skipped_count} Skipped Images')
+    total_classes = def_count + no_def_count
+    print(f'Deforestation: {def_count/total_classes} ')
+    print(f'No Deforestation: {no_def_count/total_classes} ')
 
 def apply_legal_amazon_mask(input_image: np.array, amazon_mask: np.array):
     ''' Apply Legal Amazon mask '''
@@ -111,13 +128,13 @@ if __name__== '__main__':
         default = 'data/Dataset/DETR_Patches',
         help = 'Output path to where save patches')
 
-    parser.add_argument('--min_def', type=float, default=0.001,
+    parser.add_argument('--min_def', type=float, default=0.02,
         help = 'Minimum deforestation threshold acceptable in each patch')
 
     parser.add_argument('--overlap', type=float, default=0.8,
         help = 'Minimum deforestation threshold acceptable in each patch')
 
-    parser.add_argument('--patch_size', type=int, default=256,
+    parser.add_argument('--patch_size', type=int, default=64,
         help = 'Size of each patch extracted from the whole image')
 
     parser.add_argument('--test_fill', type=int, default=1,
@@ -161,7 +178,7 @@ if __name__== '__main__':
     print(f'Img val shape: {img_val.shape}')
     print(f'Amazon mask shape shape: {mask.shape}')
     # print(f'Img test shape: {img_test.shape}')
-
+    
     # Preprocessing
     print('Starting preprocess in training...')
     train_stride = int((1-args.overlap)*args.patch_size)

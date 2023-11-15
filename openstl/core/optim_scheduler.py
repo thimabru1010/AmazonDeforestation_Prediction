@@ -152,6 +152,7 @@ def get_optim_scheduler(args, epoch, model, steps_per_epoch):
             warmup_t=args.warmup_epoch,
             t_in_epochs=True)  # update lr by_epoch
     elif sched_lower == 'step':
+        print('DEBUG Using StepLR Scheduler')
         lr_scheduler = StepLRScheduler(
             optimizer,
             decay_t=args.decay_epoch,

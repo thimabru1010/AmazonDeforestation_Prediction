@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 try:
     import lpips
@@ -13,14 +14,7 @@ except:
 def rescale(x):
     return (x - x.max()) / (x.max() - x.min()) * 2 - 1
 
-#TODO: Create Classification Metrics
-def pred_months_argmax(pred, c_months, num_classes):
-    preds = []
-    for i in range(c_months):
-        preds.append(np.argmax(pred[:, :, i*num_classes:(i+1)*num_classes], axis=2))
-    return np.stack(preds, axis=2).reshape(-1)
-
-def confusion_matrix(true, pred, num_classes=3):
+def confusion_matrix(true, pred, num_classes=2):
     # Inicialize uma matriz de confusão (confusion matrix) como uma matriz zeros 3x3
     confusion_matrix = np.zeros((num_classes, num_classes), dtype=int)
 
@@ -28,31 +22,57 @@ def confusion_matrix(true, pred, num_classes=3):
     for i in range(num_classes):
         for j in range(num_classes):
             confusion_matrix[i, j] = np.sum((true == i) & (pred == j))
-    return confusion_matrix
+    TP = confusion_matrix[0, 0]
+    FP = confusion_matrix[1, 0]
+    FN = confusion_matrix[0, 1]
+    TN = confusion_matrix[1, 1]
+    return confusion_matrix, TP, FP, FN, TN
+
+def f1_score(pred, true, test_time=False):
+    # print(pred.shape, true.shape)
+    _pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    _true = true.reshape(-1)
+    # cm, _, _, _, _ = confusion_matrix(_true, _pred)
+    # print()
+    # print(cm)
+    prec = Precision(pred, true)
+    rec = Recall(pred, true)
+    f1_clss0 = 2 * prec * rec / (prec + rec)
+    
+    _pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    _true = true.reshape(-1)
+    cm, TP, FP, FN, TN = confusion_matrix(_true, _pred)
+    if test_time:
+        print()
+        print(cm)
+    # prec = Precision(true, pred)
+    # rec = Recall(true, pred)
+    prec = TN/(TN+FN)
+    rec = TN/(TN+FP)
+    f1_clss1 = 2 * prec * rec / (prec + rec)
+    if np.isnan(f1_clss1):
+        f1_clss1 = np.array([0])
+    if np.isnan(f1_clss0):
+        f1_clss0 = np.array([0])
+    return f1_clss0, f1_clss1
 
 def Recall(pred, true):
-    pred = pred_months_argmax(pred, true.shape[2], true.shape[2])
+    pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
     true = true.reshape(-1)
-    cm = confusion_matrix(true, pred)
-    print()
-    print(pred.shape)
-    print(cm)
-    1/0
-    intersect = np.sum(pred*true)
-    total_pixel_truth = np.sum(true)
-    return np.mean(intersect/total_pixel_truth)
+    _, TP, _, FN, _ = confusion_matrix(true, pred)
+    return TP/(TP+FN)
 
 def Precision(pred, true):
-    pred = pred_months_argmax(pred, true.shape[2], true.shape[2])
+    pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
     true = true.reshape(-1)
-    intersect = np.sum(pred*true)
-    total_pixel_pred = np.sum(pred)
-    return np.mean(intersect/total_pixel_pred)
+    _, TP, FP, _, _ = confusion_matrix(true, pred)
+    return TP/(TP+FP)
 
 def ACC(pred, true):
-    pred = pred_months_argmax(pred, true.shape[2], true.shape[2])
+    pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
     true = true.reshape(-1)
-    return np.mean(pred == true)
+    cm, TP, FP, FN, TN = confusion_matrix(true, pred)
+    return (TP + TN) / (TP + FP + FN + TN)
 
 def MAE(pred, true, spatial_norm=False):
     if not spatial_norm:
@@ -152,7 +172,7 @@ class LPIPS(torch.nn.Module):
 
 def metric(pred, true, mean=None, std=None, metrics=['mae', 'mse'],
            clip_range=[0, 1], channel_names=None,
-           spatial_norm=False, return_log=True):
+           spatial_norm=False, return_log=True, test_time=False):
     """The evaluation function to output metrics.
 
     Args:
@@ -174,7 +194,7 @@ def metric(pred, true, mean=None, std=None, metrics=['mae', 'mse'],
         true = true * std + mean
     eval_res = {}
     eval_log = ""
-    allowed_metrics = ['Precision', 'Recall', 'acc', 'mae', 'mse', 'rmse', 'ssim', 'psnr', 'snr', 'lpips']
+    allowed_metrics = ['CM', 'f1_score', 'Precision', 'Recall', 'acc', 'mae', 'mse', 'rmse', 'ssim', 'psnr', 'snr', 'lpips']
     invalid_metrics = set(metrics) - set(allowed_metrics)
     if len(invalid_metrics) != 0:
         raise ValueError(f'metric {invalid_metrics} is not supported.')
@@ -185,7 +205,20 @@ def metric(pred, true, mean=None, std=None, metrics=['mae', 'mse'],
     else:
         channel_names, c_group, c_width = None, None, None
 
+    classf_metrics = ['CM', 'f1_score', 'Precision', 'Recall', 'acc']
+    if any(_metric in metrics for _metric in classf_metrics):
+        pred = F.log_softmax(torch.Tensor(pred)).numpy()
+        
     #TODO: Create Classification metrics
+    if 'CM' in metrics:
+        _pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+        _true = true.reshape(-1)
+        _, TP, FP,  FN, TN = confusion_matrix(_true, _pred)
+        eval_res['CM'] = np.array([TP, FP, FN, TN])
+        
+    if 'f1_score' in metrics:
+        eval_res['F1-Score_0'], eval_res['F1-Score_1'] = f1_score(pred, true, test_time)
+        
     if 'Recall' in metrics:
         eval_res['Recall'] = Recall(pred, true)
         
@@ -194,14 +227,6 @@ def metric(pred, true, mean=None, std=None, metrics=['mae', 'mse'],
             
     if 'acc' in metrics:
         eval_res['acc'] = ACC(pred, true)
-        # if channel_names is None:
-        # else:
-        #     acc_sum = 0.
-        #     for i, c_name in enumerate(channel_names):
-        #         eval_res[f'acc_{str(c_name)}'] = ACC(pred[:, :, i*c_width: (i+1)*c_width, ...],
-        #                                              true[:, :, i*c_width: (i+1)*c_width, ...])
-        #         acc_sum += eval_res[f'acc_{str(c_name)}']
-        #     eval_res['acc'] = acc_sum / c_group
             
     if 'mse' in metrics:
         if channel_names is None:

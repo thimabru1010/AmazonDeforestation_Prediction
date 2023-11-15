@@ -18,13 +18,18 @@ class SimVP(Base_method):
     """
 
     def __init__(self, args, device, steps_per_epoch, nclasses):
-        #TODO put ignore index and weights of Cross Entropy into constructor arguments
         Base_method.__init__(self, args, device, steps_per_epoch)
         self.nclasses = nclasses
         self.model = self._build_model(self.config)
         self.model_optim, self.scheduler, self.by_epoch = self._init_optimizer(steps_per_epoch)
         if nclasses is not None:
-            self.criterion = nn.CrossEntropyLoss(ignore_index=2)
+            if not args.test_time:
+                if args.loss_weights is not None:
+                    self.criterion = nn.CrossEntropyLoss(weight=torch.Tensor(args.loss_weights).to(device), ignore_index=2)
+                else:
+                    self.criterion = nn.CrossEntropyLoss()
+            else:
+                self.criterion = nn.CrossEntropyLoss()
         else:
             self.criterion = nn.MSELoss()
         
@@ -51,7 +56,8 @@ class SimVP(Base_method):
             #! As outras camadas são jogadas fora, pois só temos labels para o número de aft_seq_length.
             #! Sendo assim, ao aplicar a função de custo e o backpropagation o modelo irá aprender a gerar o tensor pred_y
             #! Com os valores corretos para o canal self.args.aft_seq_length.
-            pred_y = pred_y[:, :self.args.aft_seq_length] 
+            pred_y = pred_y[:, :self.args.aft_seq_length]
+            # print(pred_y.shape)
         elif self.args.aft_seq_length > self.args.pre_seq_length:
             pred_y = []
             d = self.args.aft_seq_length // self.args.pre_seq_length
@@ -90,15 +96,19 @@ class SimVP(Base_method):
             with self.amp_autocast():
                 pred_y = self._predict(batch_x)
                 #! ALTERADO
+                # print('DEBUG train_one_epoch')
+                # print(pred_y.shape, batch_y.shape)
                 B, T, C, H, W = pred_y.shape
                 pred_y = pred_y.reshape(B, -1, H, W)
-                batch_y = batch_y.reshape(B, -1, H, W)
-                loss = 0
-                window_size = batch_y.shape[1]
-                for deep_slice in range(self.nclasses):
-                    loss += self.criterion(pred_y[:, deep_slice*window_size:(deep_slice+1)*window_size], batch_y[:, deep_slice].type(torch.cuda.LongTensor))
+                batch_y = batch_y.reshape(B, -1, H, W)[:, 0]
+                # print(pred_y.shape, batch_y.shape)
+                # print(pred_y)
+                # loss = 0
+                # window_size = batch_y.shape[1]
+                # for deep_slice in range(self.nclasses):
+                    # loss += self.criterion(pred_y[:, deep_slice*window_size:(deep_slice+1)*window_size], batch_y[:, deep_slice].type(torch.cuda.LongTensor))
                 # loss /= self.nclasses
-                # loss = self.criterion(pred_y.reshape(B, -1, H, W), batch_y.reshape(B, -1, H, W))
+                loss = self.criterion(pred_y, batch_y.long())
 
             if not self.dist:
                 losses_m.update(loss.item(), batch_x.size(0))

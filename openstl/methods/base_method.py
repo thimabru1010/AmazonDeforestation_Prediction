@@ -49,11 +49,8 @@ class Base_method(object):
         self.amp_autocast = suppress  # do nothing
         self.loss_scaler = None
         # setup metrics
-        # print('DEBUG Base_method __init__')
-        # print(self.args.dataname)
-        # 1/0
         if 'custom' in self.args.dataname:
-            self.metric_list, self.spatial_norm = ['acc'], False
+            self.metric_list, self.spatial_norm = self.args.metrics, False
         elif 'weather' in self.args.dataname:
             self.metric_list, self.spatial_norm = ['mse', 'rmse', 'mae'], True
         else:
@@ -183,16 +180,12 @@ class Base_method(object):
                 #!Alterado
                 B, T, C, H, W = pred_y.shape
                 pred_y = pred_y.reshape(B, -1, H, W)
-                batch_y = batch_y.reshape(B, -1, H, W)
-                if classify:
-                    loss = 0
-                    window_size = batch_y.shape[1]
-                    for deep_slice in range(self.nclasses):
-                        loss += self.criterion(pred_y[:, deep_slice*window_size:(deep_slice+1)*window_size], batch_y[:, deep_slice].type(torch.cuda.LongTensor))
-                    eval_res['loss'] = loss.cpu() / self.nclasses
-                else:
-                    eval_res['loss'] = self.criterion(pred_y, batch_y).cpu().numpy()
+                batch_y = batch_y.reshape(B, -1, H, W)[:, 0]
+                eval_res['loss'] = self.criterion(pred_y, batch_y.long()).cpu().numpy()
                 for k in eval_res.keys():
+                    if 'CM' in k:
+                        continue
+
                     eval_res[k] = eval_res[k].reshape(1)
                 results.append(eval_res)
 
@@ -225,11 +218,24 @@ class Base_method(object):
             #TODO: Passar essa flag para o parser no inicio do programa
             results = self._nondist_forward_collect(vali_loader, len(vali_loader.dataset), gather_data=False, classify=True)
 
+        #! Alterado para caber a Confusion Matrix
         eval_log = ""
         for k, v in results.items():
-            v = v.mean()
-            if k != "loss":
-                eval_str = f"{k}:{v.mean()}" if len(eval_log) == 0 else f", {k}:{v.mean()}"
+            # print(k)
+            v_avg = v.mean()
+            if k == 'CM':
+                # eval_str = f"\n{k}:{v}\n" if len(eval_log) == 0 else f"\n{k}:{v}\n"
+                # print(v.shape)
+                cm = np.zeros((2, 2))
+                cm[0, 0] = int(v[0].sum())
+                cm[1, 0] = int(v[1].sum())
+                cm[0, 1] = int(v[2].sum())
+                cm[1, 1] = int(v[3].sum())
+                eval_str = f"\n{k}:{cm}\n"
+                eval_log += eval_str
+                
+            if k not in ["loss", "CM"]:
+                eval_str = f"{k}:{v_avg.mean()}" if len(eval_log) == 0 else f", {k}:{v_avg.mean()}"
                 eval_log += eval_str
 
         return results, eval_log

@@ -5,6 +5,7 @@ from openstl.modules import (ConvSC, ConvNeXtSubBlock, ConvMixerSubBlock, GASubB
                              HorNetSubBlock, MLPMixerSubBlock, MogaSubBlock, PoolFormerSubBlock,
                              SwinSubBlock, UniformerSubBlock, VANSubBlock, ViTSubBlock, TAUSubBlock)
 
+import torch.nn.functional as F
 
 class SimVP_Model(nn.Module):
     r"""SimVP Model
@@ -24,7 +25,7 @@ class SimVP_Model(nn.Module):
         self.enc = Encoder(C, hid_S, N_S, spatio_kernel_enc, act_inplace=act_inplace)
         #! Alterado
         if nclasses:
-            self.dec = Decoder(hid_S, nclasses*C, N_S, spatio_kernel_dec, act_inplace=act_inplace)
+            self.dec = Decoder(hid_S, nclasses, N_S, spatio_kernel_dec, act_inplace=act_inplace)
         else:
             self.dec = Decoder(hid_S, C, N_S, spatio_kernel_dec, act_inplace=act_inplace)
 
@@ -48,10 +49,14 @@ class SimVP_Model(nn.Module):
         hid = hid.reshape(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)
+        # print(Y.shape)
+        # Y = F.log_softmax(Y)
         #! ALTERADO
         # print('DEBUG SimVP_Model Forward')
         # print(Y.shape)
         Y = Y.reshape(B, T, -1, H, W)
+        # print(Y.shape)
+        # Y = Y.reshape(B, T, C, H, W)
         # print(Y.shape)
         return Y
 
