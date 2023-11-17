@@ -40,11 +40,8 @@ class CustomDataset(Dataset):
     def __getitem__(self, index):
         # data = torch.tensor(np.load(self.root_dir / 'Input' / self.data_files[index])).unsqueeze(1).float()
         # labels = torch.tensor(np.load(self.root_dir / 'Labels' / self.data_files[index])).unsqueeze(0).float()
-        data = np.load(self.root_dir / 'Input' / self.data_files[index])
-        labels = np.load(self.root_dir / 'Labels' / self.data_files[index])
-        
-        # if self.normalize:
-        #     data = data / 2
+        data = np.load(self.root_dir / 'Input' / self.data_files[index]).astype(np.float32)
+        labels = np.load(self.root_dir / 'Labels' / self.data_files[index]).astype(np.float32)
         
         if self.transform:
             transformed = self.transform(image=data.transpose(1, 2, 0), mask=labels)
@@ -56,8 +53,11 @@ class CustomDataset(Dataset):
             data = torch.tensor(data).unsqueeze(1).float()
             labels = torch.tensor(labels).unsqueeze(0).float()
             
+        # if self.normalize:
+        # data = data / 3
+        
         # data[data == 0] = -1
-        labels[labels == 2] = 0
+        # labels[labels == 50] = 0
         # print('DEBUG AmazonDataset')
         # print(data.shape)
         # data = F.one_hot(data.long(), num_classes=2).view(data.shape[0], -1, data.shape[2], data.shape[3]).float()
@@ -75,7 +75,8 @@ class CustomDataset_Test(Dataset):
         # Remember number of trimesters of test set to complete validation set
         print(img_path)
         img = load_tif_image(img_path)
-        img = img.reshape((3, -1, img.shape[1], img.shape[2])).max(axis=0)[val_fill:]
+        # img = img.reshape((3, -1, img.shape[1], img.shape[2])).max(axis=0)[val_fill:]
+        img = img.reshape((3, -1, img.shape[1], img.shape[2])).sum(axis=0)[val_fill:]
         self.original_shape = img.shape
         print(img.shape)
         
@@ -127,7 +128,7 @@ class CustomDataset_Test(Dataset):
         labels = torch.tensor(patch_window[-1]).unsqueeze(0).float()
         
         # data[data == 0] = -1
-        labels[labels == 2] = 0
+        labels[labels == 50] = 0
         # print(data.shape, labels.shape)
         
         # Apply min-max normalization

@@ -7,6 +7,7 @@ from timm.utils import AverageMeter
 from openstl.models import SimVP_Model
 from openstl.utils import reduce_tensor
 from .base_method import Base_method
+from segmentation_models_pytorch.losses import FocalLoss
 
 
 class SimVP(Base_method):
@@ -23,13 +24,14 @@ class SimVP(Base_method):
         self.model = self._build_model(self.config)
         self.model_optim, self.scheduler, self.by_epoch = self._init_optimizer(steps_per_epoch)
         if nclasses is not None:
-            if not args.test_time:
+            if args.loss == 'ce':
                 if args.loss_weights is not None:
-                    self.criterion = nn.CrossEntropyLoss(weight=torch.Tensor(args.loss_weights).to(device), ignore_index=2)
+                    self.criterion = nn.CrossEntropyLoss(weight=torch.Tensor(args.loss_weights).to(device), ignore_index=50)
                 else:
-                    self.criterion = nn.CrossEntropyLoss()
-            else:
-                self.criterion = nn.CrossEntropyLoss()
+                    self.criterion = nn.CrossEntropyLoss(ignore_index=50)
+            elif args.loss == 'focal':
+                # self.criterion = FocalLoss("multiclass", gamma=3, ignore_index=50).to(device)
+                self.criterion = FocalLoss("binary", gamma=3, ignore_index=50).to(device)
         else:
             self.criterion = nn.MSELoss()
         

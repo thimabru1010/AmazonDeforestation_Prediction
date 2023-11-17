@@ -77,14 +77,14 @@ def plot_videos_side_by_side(video1, video2, video3, output_gif_path):
     # plt.show()
 
 
-EX_NAME = 'custom_exp18'
+EX_NAME = 'custom_exp23'
 # root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/Dataset/DETR_Patches')
 img_path = Path('/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/test.tif')
 exp_path = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/work_dirs/{EX_NAME}')
 
 batch_size = 32
 Debug = False
-val_fill = 1
+val_fill = 2
 
 
 custom_training_config = {
@@ -108,7 +108,8 @@ custom_training_config = {
     'decay_rate': 0.5,
     'resume_from': None,
     'auto_resume': False,
-    'test_time': True
+    'test_time': True,
+    'loss': 'focal'
 }
 
 custom_model_config = {
@@ -165,7 +166,8 @@ mask[mask == 1] = 0.0
 
 # preds = np.argmax(np.load(exp_path / 'saved' / 'preds.npy'), axis=2)
 logits = np.load(exp_path / 'saved' / 'preds.npy')
-preds = F.log_softmax(torch.Tensor(logits)).numpy()
+print(logits.shape)
+preds = F.softmax(torch.Tensor(logits), dim=2).numpy()
 print('DEBUG Probs vs Logits')
 print(logits.max(), logits.min())
 print(preds.max(), preds.min())
@@ -180,6 +182,30 @@ window_size = 5
 preds0 = preds[:, :, 0]
 preds1 = preds[:, :, 1]
 preds_argmax = np.argmax(preds, axis=2)
+th = 0.7
+preds_argmax = preds1.copy()
+preds_argmax[preds1 >= th] = 1
+preds_argmax[preds1 < th] = 0
+
+# Plot the histograms side by side
+plt.figure(figsize=(10, 4))
+
+plt.subplot(1, 2, 1)
+plt.hist(preds0.reshape(-1), bins=10, range=(0, 1), edgecolor='black', alpha=0.7)
+plt.title('No def Probs')
+# plt.xlabel('Value')
+# plt.ylabel('Frequency')
+
+plt.subplot(1, 2, 2)
+plt.hist(preds1.reshape(-1), bins=10, range=(0, 1), edgecolor='black', alpha=0.7)
+plt.title('Def Probs')
+# plt.xlabel('Value')
+# plt.ylabel('Frequency')
+
+plt.tight_layout()
+# Save the figure with 300 DPI
+plt.savefig(exp_path / 'saved' / 'classes_probs_hist.jpeg', dpi=300)
+# plt.show()
 
 img_recs = []
 for i, _pred in enumerate([preds0, preds1, preds_argmax]):

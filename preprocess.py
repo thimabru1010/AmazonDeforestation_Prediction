@@ -44,12 +44,12 @@ def load_tif_image(tif_path):
 
 def extract_patches(image: np.ndarray, patch_size: int, stride: int) -> np.ndarray:
     window_shape_array = (image.shape[0], patch_size, patch_size)
+    print(image.shape)
     return np.array(view_as_windows(image, window_shape_array, step=stride)).reshape((-1,) + window_shape_array)
 
 def preprocess_patches(img_train: np.ndarray, patch_size: int, overlap_stride: int):
     print('Extracting patches...')
     patches = extract_patches(img_train, patch_size=patch_size, stride=overlap_stride)
-    patches = patches.reshape((-1, img_train.shape[0], patch_size, patch_size))
     print(f'Patches extracted: {patches.shape}')
 
     # Filter deforestation
@@ -63,7 +63,7 @@ def preprocess_patches(img_train: np.ndarray, patch_size: int, overlap_stride: i
     # return patches_filt
     return patches
     
-def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, window_size: int=5, window_stride: int=1):
+def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, window_size: int=5):
     folder_path = save_path / modality
     folder_path_input = folder_path / 'Input'
     folder_path_labels = folder_path / 'Labels'
@@ -74,6 +74,7 @@ def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, wi
     skipped_count = 0
     def_count = 0
     no_def_count = 0
+    
     total_iterations = patches.shape[0] * (patches.shape[1] - window_size + 1)
     with tqdm(total=total_iterations, desc=f'{modality}:Saving Patches') as pbar:
         for i, patch in enumerate(patches):
@@ -83,14 +84,17 @@ def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, wi
                 # print(windowed_patch.shape)
                 # print(patch[j:j+window_size-1].shape, patch[j+window_size].shape)
                 input_windowed_patch = windowed_patch[:-1]
-                input_windowed_patch[input_windowed_patch == 2] = 0
+                input_windowed_patch[input_windowed_patch == 50] = 0
                 labels_windowed_patch = windowed_patch[-1]
-                if np.mean(labels_windowed_patch == 1, axis=(0, 1)) < args.min_def:
-                    skipped_count += 1
-                    pbar.update(1)
-                    continue
-                def_count += np.sum(labels_windowed_patch == 1)
+                labels_windowed_patch[labels_windowed_patch == 50] = -1
+                if np.mean(labels_windowed_patch > 0, axis=(0, 1)) < args.min_def:
+                        skipped_count += 1
+                        pbar.update(1)
+                        continue
+                labels_windowed_patch[labels_windowed_patch > 0] = 1.0
+                def_count += np.sum(labels_windowed_patch > 0)
                 no_def_count += np.sum(labels_windowed_patch == 0)
+                labels_windowed_patch[labels_windowed_patch == -1] = 50.0
                 # print(input_windowed_patch.shape, labels_windowed_patch.shape)
                 np.save(os.path.join(folder_path_input, f'patch={i}_trimester_window={j}.npy'), input_windowed_patch)
                 np.save(os.path.join(folder_path_labels, f'patch={i}_trimester_window={j}.npy'), labels_windowed_patch)
@@ -105,7 +109,7 @@ def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, wi
 def apply_legal_amazon_mask(input_image: np.array, amazon_mask: np.array):
     ''' Apply Legal Amazon mask '''
     for i in range(input_image.shape[0]):
-        input_image[i, :, :][amazon_mask == 2.0] = 2.0
+        input_image[i, :, :][amazon_mask == 50.0] = 50.0
     return input_image
 
 if __name__== '__main__':
@@ -139,6 +143,9 @@ if __name__== '__main__':
 
     parser.add_argument('--test_fill', type=int, default=1,
         help = 'Number of trimesters of test set to complete validation set')
+    
+    parser.add_argument('--aggregation', '-agg', type=str, default='max',
+        help = 'Type of aggregation to use when grouping months in trimesters')
 
     args = parser.parse_args()
 
@@ -152,8 +159,12 @@ if __name__== '__main__':
     img_test = load_tif_image(args.test_path)
 
     # Group in trimesters by the maximum
-    img_test = img_test.reshape((3, -1, img_test.shape[1], img_test.shape[2])).max(axis=0)
-    img_train = img_train.reshape((3, -1, img_train.shape[1], img_train.shape[2])).max(axis=0)
+    if args.aggregation == 'max':
+        img_test = img_test.reshape((3, -1, img_test.shape[1], img_test.shape[2])).max(axis=0)
+        img_train = img_train.reshape((3, -1, img_train.shape[1], img_train.shape[2])).max(axis=0)
+    if args.aggregation == 'sum':
+        img_test = img_test.reshape((3, -1, img_test.shape[1], img_test.shape[2])).sum(axis=0)
+        img_train = img_train.reshape((3, -1, img_train.shape[1], img_train.shape[2])).sum(axis=0)
     
     # Cut image H x W to have a integer number of patches
     height_cut = (img_train.shape[1] // args.patch_size) * args.patch_size
@@ -163,10 +174,11 @@ if __name__== '__main__':
     mask = mask[:height_cut, :width_cut]
     img_test = img_test[:, :height_cut, :width_cut]
 
-    mask[mask == 0.0] = 2.0
+    mask[mask == 0.0] = 50.0
     mask[mask == 1] = 0.0
 
     img_train = apply_legal_amazon_mask(img_train, mask)
+    img_test = apply_legal_amazon_mask(img_test, mask)
     
     # 8-12 tri->2019 + 0 tri -> 2020
     # img_val = np.concatenate((img_train[24:36, :, :], img_test[:args.test_fill, :, :]), axis=0)
@@ -189,6 +201,7 @@ if __name__== '__main__':
     save_patches(patches_filt, 'Train', args.save_path)
         
     print('\nStarting preprocess in validation...')
+    # patches_filt = preprocess_patches(img_val, args.patch_size, train_stride)
     patches_filt = preprocess_patches(img_val, args.patch_size, train_stride)
     
     save_patches(patches_filt, 'Val', args.save_path)

@@ -207,11 +207,14 @@ def metric(pred, true, mean=None, std=None, metrics=['mae', 'mse'],
 
     classf_metrics = ['CM', 'f1_score', 'Precision', 'Recall', 'acc']
     if any(_metric in metrics for _metric in classf_metrics):
-        pred = F.log_softmax(torch.Tensor(pred)).numpy()
+        # print('DEBUG metrics')
+        # print(pred.shape)
+        pred = F.softmax(torch.Tensor(pred), dim=2).numpy()
         
     #TODO: Create Classification metrics
     if 'CM' in metrics:
         _pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+        # _pred = pred[:, :, 1] > 0.5
         _true = true.reshape(-1)
         _, TP, FP,  FN, TN = confusion_matrix(_true, _pred)
         eval_res['CM'] = np.array([TP, FP, FN, TN])

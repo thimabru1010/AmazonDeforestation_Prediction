@@ -52,7 +52,6 @@ loss_weights = [0.05, 0.95]
 # loss_weights = None # Tentar 0.6 e 0.4
 print(f'Loss weights: {loss_weights}')
 
-#TODO: Aplicar Data Augmentation
 prob = 0.5
 copy_fn = lambda x, **kwargs: x.copy()
 transform = A.Compose(
@@ -88,7 +87,7 @@ custom_training_config = {
     'lr': 1e-2,   
     'metrics': ['acc', 'Recall', 'Precision', 'f1_score', 'CM'],
 
-    'ex_name': 'custom_exp20', # custom_exp
+    'ex_name': 'custom_exp23', # custom_exp
     'dataname': 'custom',
     'in_shape': [4, 1, 64, 64], # T, C, H, W = self.args.in_shape
     'loss_weights': loss_weights,
@@ -101,7 +100,8 @@ custom_training_config = {
     'resume_from': None,
     'auto_resume': False,
     'test_time': False,
-    'seed': 1
+    'seed': 1,
+    'loss': 'focal'
 }
 
 custom_model_config = {
@@ -133,7 +133,7 @@ for attribute in default_values.keys():
     if config[attribute] is None:
         config[attribute] = default_values[attribute]
 
-exp = BaseExperiment(args, dataloaders=(dataloader_train, dataloader_val, None), nclasses=2)
+exp = BaseExperiment(args, dataloaders=(dataloader_train, dataloader_val, None), nclasses=3)
 
 #TODO: Botar weights na Cross Entropy para balancear os labels
 print('>'*35 + ' training ' + '<'*35)
