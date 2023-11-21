@@ -181,7 +181,7 @@ class Base_method(object):
                 B, T, C, H, W = pred_y.shape
                 pred_y = pred_y.reshape(B, -1, H, W)
                 batch_y = batch_y.reshape(B, -1, H, W)[:, 0]
-                eval_res['loss'] = self.criterion(pred_y, batch_y.long()).cpu().numpy()
+                eval_res['loss'] = self.criterion(pred_y.contiguous(), batch_y.long().contiguous()).cpu().numpy()
                 for k in eval_res.keys():
                     if 'CM' in k:
                         continue

@@ -56,6 +56,7 @@ class CustomDataset(Dataset):
         # if self.normalize:
         # data = data / 3
         
+        # print(labels.shape)
         # data[data == 0] = -1
         # labels[labels == 50] = 0
         # print('DEBUG AmazonDataset')

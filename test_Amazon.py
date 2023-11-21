@@ -77,7 +77,7 @@ def plot_videos_side_by_side(video1, video2, video3, output_gif_path):
     # plt.show()
 
 
-EX_NAME = 'custom_exp23'
+EX_NAME = 'custom_exp24'
 # root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/Dataset/DETR_Patches')
 img_path = Path('/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/test.tif')
 exp_path = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/work_dirs/{EX_NAME}')
@@ -147,7 +147,7 @@ for attribute in default_values.keys():
     if config[attribute] is None:
         config[attribute] = default_values[attribute]
 
-exp = BaseExperiment(args, dataloaders=(dataloader_test, None, dataloader_test), nclasses=2)
+exp = BaseExperiment(args, dataloaders=(dataloader_test, None, dataloader_test), nclasses=1)
 
 print('>'*35 + ' testing  ' + '<'*35)
 exp.test(classify=True)
@@ -168,6 +168,7 @@ mask[mask == 1] = 0.0
 logits = np.load(exp_path / 'saved' / 'preds.npy')
 print(logits.shape)
 preds = F.softmax(torch.Tensor(logits), dim=2).numpy()
+# preds = F.sigmoid(torch.Tensor(logits)).numpy()
 print('DEBUG Probs vs Logits')
 print(logits.max(), logits.min())
 print(preds.max(), preds.min())
@@ -181,7 +182,9 @@ window_size = 5
 
 preds0 = preds[:, :, 0]
 preds1 = preds[:, :, 1]
+# preds1 = preds[:, :, 0]
 preds_argmax = np.argmax(preds, axis=2)
+preds_argmax = preds0
 th = 0.7
 preds_argmax = preds1.copy()
 preds_argmax[preds1 >= th] = 1

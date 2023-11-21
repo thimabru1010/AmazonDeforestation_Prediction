@@ -30,7 +30,10 @@ def confusion_matrix(true, pred, num_classes=2):
 
 def f1_score(pred, true, test_time=False):
     # print(pred.shape, true.shape)
-    _pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    # _pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    _pred = pred.reshape(-1)
+    _pred[_pred >= 0.5] = 1
+    _pred[_pred < 0.5] = 0
     _true = true.reshape(-1)
     # cm, _, _, _, _ = confusion_matrix(_true, _pred)
     # print()
@@ -39,7 +42,10 @@ def f1_score(pred, true, test_time=False):
     rec = Recall(pred, true)
     f1_clss0 = 2 * prec * rec / (prec + rec)
     
-    _pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    # _pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    _pred = pred.reshape(-1)
+    _pred[_pred >= 0.5] = 1
+    _pred[_pred < 0.5] = 0
     _true = true.reshape(-1)
     cm, TP, FP, FN, TN = confusion_matrix(_true, _pred)
     if test_time:
@@ -57,19 +63,28 @@ def f1_score(pred, true, test_time=False):
     return f1_clss0, f1_clss1
 
 def Recall(pred, true):
-    pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    # pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    pred = pred.reshape(-1)
+    pred[pred >= 0.5] = 1
+    pred[pred < 0.5] = 0
     true = true.reshape(-1)
     _, TP, _, FN, _ = confusion_matrix(true, pred)
     return TP/(TP+FN)
 
 def Precision(pred, true):
-    pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    # pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    pred = pred.reshape(-1)
+    pred[pred >= 0.5] = 1
+    pred[pred < 0.5] = 0
     true = true.reshape(-1)
     _, TP, FP, _, _ = confusion_matrix(true, pred)
     return TP/(TP+FP)
 
 def ACC(pred, true):
-    pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    # pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+    pred = pred.reshape(-1)
+    pred[pred >= 0.5] = 1
+    pred[pred < 0.5] = 0
     true = true.reshape(-1)
     cm, TP, FP, FN, TN = confusion_matrix(true, pred)
     return (TP + TN) / (TP + FP + FN + TN)
@@ -209,11 +224,16 @@ def metric(pred, true, mean=None, std=None, metrics=['mae', 'mse'],
     if any(_metric in metrics for _metric in classf_metrics):
         # print('DEBUG metrics')
         # print(pred.shape)
-        pred = F.softmax(torch.Tensor(pred), dim=2).numpy()
+        # pred = F.softmax(torch.Tensor(pred), dim=2).numpy()
+        # pred = pred[:, 0, 1]
+        pred = F.sigmoid(torch.Tensor(pred)).numpy()
         
     #TODO: Create Classification metrics
     if 'CM' in metrics:
-        _pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+        # _pred = np.argmax(pred, axis=2)[:, 0].reshape(-1)
+        _pred = pred.reshape(-1)
+        _pred[_pred >= 0.5] = 1
+        _pred[_pred < 0.5] = 0
         # _pred = pred[:, :, 1] > 0.5
         _true = true.reshape(-1)
         _, TP, FP,  FN, TN = confusion_matrix(_true, _pred)

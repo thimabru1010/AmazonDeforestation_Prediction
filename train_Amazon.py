@@ -1,6 +1,7 @@
 
 import torch
 from AmazonDataset import CustomDataset
+from GiovanniDataset import GiovanniDataset
 from pathlib import Path
 import numpy as np
 from openstl.api import BaseExperiment
@@ -9,6 +10,9 @@ from osgeo import gdal
 import json
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+import pandas as pd
+import geopandas as gpd
+import GiovConfig as config
 
 def load_tif_image(tif_path):
     gdal_header = gdal.Open(str(tif_path))
@@ -23,9 +27,10 @@ def apply_legal_amazon_mask(input_image: np.array, amazon_mask: np.array):
 root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/Dataset/DETR_Patches')
 
 print(root_dir)
-batch_size = 32
+batch_size = 16
 num_workers = 8
 Debug = False
+data_prep = 'giov'
 
 # Calculate weights
 mask_path = '/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/area.tif'
@@ -48,8 +53,8 @@ print(f'Class numbers: 0: {class0_pixels} - 1: {class1_pixels} - Total: {total_p
 print(f'Class percentages: 0: {class0_pixels / total_pixels} - 1: {class1_pixels / total_pixels}')
 # loss_weights = [int(total_pixels / class0_pixels), int(total_pixels / class1_pixels)]
 # loss_weights = [1 - (class0_pixels / total_pixels), 1 - (class1_pixels / total_pixels)]
-loss_weights = [0.05, 0.95]
-# loss_weights = None # Tentar 0.6 e 0.4
+# loss_weights = [0.05, 0.95]
+loss_weights = None # Tentar 0.6 e 0.4
 print(f'Loss weights: {loss_weights}')
 
 prob = 0.5
@@ -63,9 +68,55 @@ transform = A.Compose(
     ], is_check_shapes=False
 )
 
-train_set = CustomDataset(root_dir=root_dir / 'Train', Debug=Debug, transform=transform)
-val_set = CustomDataset(root_dir=root_dir / 'Val', Debug=Debug)
-# test_set = CustomDataset(root_dir=root_dir / 'Test', Debug=Debug, Test=True)
+if data_prep == 'thiago':
+    train_set = CustomDataset(root_dir=root_dir / 'Train', Debug=Debug, transform=transform)
+    val_set = CustomDataset(root_dir=root_dir / 'Val', Debug=Debug)
+elif data_prep == 'giov':
+    # load legal amazon limits
+    am_bounds = gpd.read_file(config.AMAZON_FRONTIER_DATA)
+    # load frames idx detail
+    frames_idx = pd.read_csv(config.TR_FRAMES_IDX, index_col=0)
+    # load frames deforestation area history
+    deforestation = pd.read_csv(config.TR_DEFORESTATION, index_col=0)
+    deforestation["quarter_date"] = pd.to_datetime(deforestation["quarter_date"])
+    # counties
+    frames_county = pd.read_csv(config.TR_COUNTIES, index_col=0)
+    counties_defor = pd.read_csv(config.TR_COUNTIES_DEFOR, index_col=0)
+    # precipitations
+    precip = pd.read_csv(config.TR_RAIN_AVG)
+    precip["quarter_date"] = pd.to_datetime(precip["dt"])
+    # terrain position index
+    tpi = pd.read_csv(config.TR_TPI, skiprows=1)\
+        .rename(columns={"Unnamed: 0": "frame_id"})
+
+    train_set = CustomDataset(
+        train_data, 
+        patches_sample_train, 
+        frames_idx, 
+        county_data,
+        counties_time_grid,
+        precip_time_grid,
+        tpi_array,
+        None,
+        scores_time_grid,
+        night_time_grid
+    )
+
+    val_set = CustomDataset(
+        test_data, 
+        patches_sample_val, 
+        frames_idx, 
+        county_data,
+        counties_time_grid,
+        precip_time_grid,
+        tpi_array,
+        None,
+        scores_time_grid,
+        night_time_grid
+    )
+
+    train_set = GiovanniDataset(root_dir=root_dir / 'Train', Debug=Debug, transform=transform)
+    val_set = GiovanniDataset(root_dir=root_dir / 'Val', Debug=Debug)
 
 print(len(train_set), len(val_set))
 
@@ -87,7 +138,7 @@ custom_training_config = {
     'lr': 1e-2,   
     'metrics': ['acc', 'Recall', 'Precision', 'f1_score', 'CM'],
 
-    'ex_name': 'custom_exp23', # custom_exp
+    'ex_name': 'custom_exp25', # custom_exp
     'dataname': 'custom',
     'in_shape': [4, 1, 64, 64], # T, C, H, W = self.args.in_shape
     'loss_weights': loss_weights,
@@ -133,7 +184,7 @@ for attribute in default_values.keys():
     if config[attribute] is None:
         config[attribute] = default_values[attribute]
 
-exp = BaseExperiment(args, dataloaders=(dataloader_train, dataloader_val, None), nclasses=3)
+exp = BaseExperiment(args, dataloaders=(dataloader_train, dataloader_val, None), nclasses=2)
 
 #TODO: Botar weights na Cross Entropy para balancear os labels
 print('>'*35 + ' training ' + '<'*35)

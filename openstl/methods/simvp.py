@@ -23,17 +23,17 @@ class SimVP(Base_method):
         self.nclasses = nclasses
         self.model = self._build_model(self.config)
         self.model_optim, self.scheduler, self.by_epoch = self._init_optimizer(steps_per_epoch)
-        if nclasses is not None:
-            if args.loss == 'ce':
-                if args.loss_weights is not None:
-                    self.criterion = nn.CrossEntropyLoss(weight=torch.Tensor(args.loss_weights).to(device), ignore_index=50)
-                else:
-                    self.criterion = nn.CrossEntropyLoss(ignore_index=50)
-            elif args.loss == 'focal':
-                # self.criterion = FocalLoss("multiclass", gamma=3, ignore_index=50).to(device)
-                self.criterion = FocalLoss("binary", gamma=3, ignore_index=50).to(device)
-        else:
+        if nclasses is None:
             self.criterion = nn.MSELoss()
+            
+        if args.loss == 'ce':
+            if args.loss_weights is not None:
+                self.criterion = nn.CrossEntropyLoss(weight=torch.Tensor(args.loss_weights).to(device), ignore_index=50)
+            else:
+                self.criterion = nn.CrossEntropyLoss(ignore_index=50)
+        elif args.loss == 'focal':
+            self.criterion = FocalLoss("multiclass", gamma=3, ignore_index=50).to(device)
+            # self.criterion = FocalLoss("binary", gamma=3, ignore_index=50).to(device)
         
     def _build_model(self, args):
         return SimVP_Model(nclasses=self.nclasses, **args).to(self.device)
@@ -110,7 +110,7 @@ class SimVP(Base_method):
                 # for deep_slice in range(self.nclasses):
                     # loss += self.criterion(pred_y[:, deep_slice*window_size:(deep_slice+1)*window_size], batch_y[:, deep_slice].type(torch.cuda.LongTensor))
                 # loss /= self.nclasses
-                loss = self.criterion(pred_y, batch_y.long())
+                loss = self.criterion(pred_y.contiguous() , batch_y.long().contiguous() )
 
             if not self.dist:
                 losses_m.update(loss.item(), batch_x.size(0))
