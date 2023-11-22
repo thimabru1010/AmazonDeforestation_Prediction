@@ -123,7 +123,7 @@ class GiovanniDataset(Dataset):
                     idx_frames["y"].min()-self.iy:idx_frames["y"].max()-self.iy+1
                 ]
             ])
-        data = torch.tensor(input_matrix).float().to(dev)
+        data = torch.tensor(input_matrix).float().to(self.device)
 
         # get output
         labels = np.zeros(

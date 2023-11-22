@@ -72,51 +72,9 @@ if data_prep == 'thiago':
     train_set = CustomDataset(root_dir=root_dir / 'Train', Debug=Debug, transform=transform)
     val_set = CustomDataset(root_dir=root_dir / 'Val', Debug=Debug)
 elif data_prep == 'giov':
-    # load legal amazon limits
-    am_bounds = gpd.read_file(config.AMAZON_FRONTIER_DATA)
-    # load frames idx detail
-    frames_idx = pd.read_csv(config.TR_FRAMES_IDX, index_col=0)
-    # load frames deforestation area history
-    deforestation = pd.read_csv(config.TR_DEFORESTATION, index_col=0)
-    deforestation["quarter_date"] = pd.to_datetime(deforestation["quarter_date"])
-    # counties
-    frames_county = pd.read_csv(config.TR_COUNTIES, index_col=0)
-    counties_defor = pd.read_csv(config.TR_COUNTIES_DEFOR, index_col=0)
-    # precipitations
-    precip = pd.read_csv(config.TR_RAIN_AVG)
-    precip["quarter_date"] = pd.to_datetime(precip["dt"])
-    # terrain position index
-    tpi = pd.read_csv(config.TR_TPI, skiprows=1)\
-        .rename(columns={"Unnamed: 0": "frame_id"})
 
-    train_set = CustomDataset(
-        train_data, 
-        patches_sample_train, 
-        frames_idx, 
-        county_data,
-        counties_time_grid,
-        precip_time_grid,
-        tpi_array,
-        None,
-        scores_time_grid,
-        night_time_grid
-    )
-
-    val_set = CustomDataset(
-        test_data, 
-        patches_sample_val, 
-        frames_idx, 
-        county_data,
-        counties_time_grid,
-        precip_time_grid,
-        tpi_array,
-        None,
-        scores_time_grid,
-        night_time_grid
-    )
-
-    train_set = GiovanniDataset(root_dir=root_dir / 'Train', Debug=Debug, transform=transform)
-    val_set = GiovanniDataset(root_dir=root_dir / 'Val', Debug=Debug)
+    train_set = GiovanniDataset()
+    val_set = GiovanniDataset()
 
 print(len(train_set), len(val_set))
 
