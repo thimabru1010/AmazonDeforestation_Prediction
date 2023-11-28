@@ -96,6 +96,7 @@ class SimVP(Base_method):
             runner.call_hook('before_train_iter')
 
             with self.amp_autocast():
+                # print(batch_x.shape, batch_y.shape)
                 pred_y = self._predict(batch_x)
                 #! ALTERADO
                 # print('DEBUG train_one_epoch')

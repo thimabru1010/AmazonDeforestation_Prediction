@@ -13,6 +13,7 @@ from albumentations.pytorch import ToTensorV2
 import pandas as pd
 import geopandas as gpd
 import GiovConfig as config
+from prep_giov_data import prep4dataset
 
 def load_tif_image(tif_path):
     gdal_header = gdal.Open(str(tif_path))
@@ -32,49 +33,79 @@ num_workers = 8
 Debug = False
 data_prep = 'giov'
 
-# Calculate weights
-mask_path = '/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/area.tif'
-train_path = '/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/train.tif'
-mask = load_tif_image(mask_path)
-img_train = load_tif_image(train_path)
-img_train = img_train.reshape((3, -1, img_train.shape[1], img_train.shape[2])).max(axis=0)
+if data_prep == 'giov':
+    loss_weights = None
+    
+    train_data, val_data, patches_sample_train, patches_sample_val, frames_idx, county_data, counties_time_grid, \
+        precip_time_grid, tpi_array, scores_time_grid, night_time_grid = prep4dataset(config)
+    
+    train_set = GiovanniDataset(
+        train_data, 
+        patches_sample_train, 
+        frames_idx, 
+        county_data,
+        counties_time_grid,
+        precip_time_grid,
+        tpi_array,
+        None,
+        scores_time_grid,
+        night_time_grid,
+        device=None
+    )
+    
+    val_set = GiovanniDataset(
+        val_data, #previously = test_data
+        patches_sample_val, 
+        frames_idx, 
+        county_data,
+        counties_time_grid,
+        precip_time_grid,
+        tpi_array,
+        None,
+        scores_time_grid,
+        night_time_grid,
+        device=None
+    )
 
-# mask[mask == 0.0] = 2.0
-# mask[mask == 1] = 0.0
-# print(mask.shape)
+else:
+    # Calculate weights
+    mask_path = '/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/area.tif'
+    train_path = '/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/train.tif'
+    mask = load_tif_image(mask_path)
+    img_train = load_tif_image(train_path)
+    img_train = img_train.reshape((3, -1, img_train.shape[1], img_train.shape[2])).max(axis=0)
 
-# img_train = apply_legal_amazon_mask(img_train, mask)
+    # mask[mask == 0.0] = 2.0
+    # mask[mask == 1] = 0.0
+    # print(mask.shape)
 
-class0_pixels = np.sum(img_train == 0)
-class1_pixels = np.sum(img_train == 1)
-total_pixels = class0_pixels + class1_pixels
+    # img_train = apply_legal_amazon_mask(img_train, mask)
 
-print(f'Class numbers: 0: {class0_pixels} - 1: {class1_pixels} - Total: {total_pixels} - Shape: {img_train.shape[0] * img_train.shape[1] * img_train.shape[2]}')
-print(f'Class percentages: 0: {class0_pixels / total_pixels} - 1: {class1_pixels / total_pixels}')
-# loss_weights = [int(total_pixels / class0_pixels), int(total_pixels / class1_pixels)]
-# loss_weights = [1 - (class0_pixels / total_pixels), 1 - (class1_pixels / total_pixels)]
-# loss_weights = [0.05, 0.95]
-loss_weights = None # Tentar 0.6 e 0.4
-print(f'Loss weights: {loss_weights}')
+    class0_pixels = np.sum(img_train == 0)
+    class1_pixels = np.sum(img_train == 1)
+    total_pixels = class0_pixels + class1_pixels
 
-prob = 0.5
-copy_fn = lambda x, **kwargs: x.copy()
-transform = A.Compose(
-    [
-        A.RandomRotate90(p=prob),
-        A.OneOf([A.HorizontalFlip(p=prob), A.VerticalFlip(p=prob)]),
-        A.Lambda(image=copy_fn, mask=copy_fn),
-        ToTensorV2()
-    ], is_check_shapes=False
-)
+    print(f'Class numbers: 0: {class0_pixels} - 1: {class1_pixels} - Total: {total_pixels} - Shape: {img_train.shape[0] * img_train.shape[1] * img_train.shape[2]}')
+    print(f'Class percentages: 0: {class0_pixels / total_pixels} - 1: {class1_pixels / total_pixels}')
+    # loss_weights = [int(total_pixels / class0_pixels), int(total_pixels / class1_pixels)]
+    # loss_weights = [1 - (class0_pixels / total_pixels), 1 - (class1_pixels / total_pixels)]
+    # loss_weights = [0.05, 0.95]
+    loss_weights = None # Tentar 0.6 e 0.4
+    print(f'Loss weights: {loss_weights}')
 
-if data_prep == 'thiago':
+    prob = 0.5
+    copy_fn = lambda x, **kwargs: x.copy()
+    transform = A.Compose(
+        [
+            A.RandomRotate90(p=prob),
+            A.OneOf([A.HorizontalFlip(p=prob), A.VerticalFlip(p=prob)]),
+            A.Lambda(image=copy_fn, mask=copy_fn),
+            ToTensorV2()
+        ], is_check_shapes=False
+    )
+
     train_set = CustomDataset(root_dir=root_dir / 'Train', Debug=Debug, transform=transform)
     val_set = CustomDataset(root_dir=root_dir / 'Val', Debug=Debug)
-elif data_prep == 'giov':
-
-    train_set = GiovanniDataset()
-    val_set = GiovanniDataset()
 
 print(len(train_set), len(val_set))
 
@@ -96,9 +127,9 @@ custom_training_config = {
     'lr': 1e-2,   
     'metrics': ['acc', 'Recall', 'Precision', 'f1_score', 'CM'],
 
-    'ex_name': 'custom_exp25', # custom_exp
+    'ex_name': 'custom_exp26', # custom_exp
     'dataname': 'custom',
-    'in_shape': [4, 1, 64, 64], # T, C, H, W = self.args.in_shape
+    'in_shape': [4, 9, 64, 64], # T, C, H, W = self.args.in_shape
     'loss_weights': loss_weights,
     'early_stop_epoch': 10,
     'warmup_epoch': 0, #default = 0

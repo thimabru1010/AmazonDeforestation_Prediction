@@ -130,7 +130,8 @@ class CustomDataset_Test(Dataset):
         
         # data[data == 0] = -1
         labels[labels == 50] = 0
-        # print(data.shape, labels.shape)
+        print(data.shape, labels.shape)
+        1/0
         
         # Apply min-max normalization
         # if self.normalize:

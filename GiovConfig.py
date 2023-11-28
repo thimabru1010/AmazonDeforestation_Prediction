@@ -13,9 +13,9 @@ AMAZON_FRONTIER_DATA = os.path.join(RAW_DATA_PATH, "brazilian_legal_amazon")
 INITIAL_DEFORESTATION = os.path.join(RAW_DATA_PATH, "accumulated_deforestation_2007")
 DETER_DATA = os.path.join(RAW_DATA_PATH, "deter-amz-public-2023set08")
 PRODES_DATA = os.path.join(RAW_DATA_PATH, "yearly_deforestation")
-COUNTIES_DATA = os.path.join(RAW_DATA_PATH, "municipios")
+COUNTIES_DATA = os.path.join(RAW_DATA_PATH, "municipios") # Densidade e população
 RAIN_DATA = os.path.join(RAW_DATA_PATH, "precipitations")
-TPI_DATA = os.path.join(RAW_DATA_PATH, "TPI.tif")
+TPI_DATA = os.path.join(RAW_DATA_PATH, "TPI.tif") # Temperature
 LANDCOVER_DATA = os.path.join(RAW_DATA_PATH, "landcover.tif")
 NIGHT_LIGHT_DATA = os.path.join(RAW_DATA_PATH, "night_lights")
 
