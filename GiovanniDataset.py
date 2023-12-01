@@ -93,11 +93,14 @@ class GiovanniDataset(Dataset):
                     idx_frames["y"].min()-self.iy:idx_frames["y"].max()-self.iy+1]], axis=1)
         
         if self.tpi_data is not None:
-            input_matrix = np.concatenate([input_matrix, self.tpi_data[
+            tpi_data = self.tpi_data[
                     :,
                     np.newaxis,
                     idx_frames["x"].min()-self.ix:idx_frames["x"].max()-self.ix+1, 
-                    idx_frames["y"].min()-self.iy:idx_frames["y"].max()-self.iy+1]], axis=1)
+                    idx_frames["y"].min()-self.iy:idx_frames["y"].max()-self.iy+1]
+            print(tpi_data.shape)
+            1/0
+            input_matrix = np.concatenate([input_matrix, tpi_data], axis=1)
         
         if self.landcover_data is not None:
             input_matrix = np.concatenate([

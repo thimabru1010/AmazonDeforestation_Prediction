@@ -39,6 +39,12 @@ if data_prep == 'giov':
     train_data, val_data, patches_sample_train, patches_sample_val, frames_idx, county_data, counties_time_grid, \
         precip_time_grid, tpi_array, scores_time_grid, night_time_grid = prep4dataset(config)
     
+    county_data = None
+    counties_time_grid = None
+    precip_time_grid = None
+    tpi_array = None
+    scores_time_grid = None
+    night_time_grid = None
     train_set = GiovanniDataset(
         train_data, 
         patches_sample_train, 
@@ -123,13 +129,13 @@ custom_training_config = {
     'total_length': 5,
     'batch_size': batch_size,
     'val_batch_size': batch_size,
-    'epoch': 30,
+    'epoch': 15,
     'lr': 1e-2,   
     'metrics': ['acc', 'Recall', 'Precision', 'f1_score', 'CM'],
 
-    'ex_name': 'custom_exp26', # custom_exp
+    'ex_name': 'custom_exp32', # custom_exp
     'dataname': 'custom',
-    'in_shape': [4, 9, 64, 64], # T, C, H, W = self.args.in_shape
+    'in_shape': [4, 1, 64, 64], # T, C, H, W = self.args.in_shape
     'loss_weights': loss_weights,
     'early_stop_epoch': 10,
     'warmup_epoch': 0, #default = 0

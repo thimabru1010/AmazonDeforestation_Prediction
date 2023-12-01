@@ -1,0 +1,87 @@
+Exp 26 --> All features
+[4, 9, 64, 64]
+
+[[3146875 3895310]
+ [   7956   11363]]
+F1-score: 0.6172 - F1-score No Def: 0.6172 - F1-score Def: 0.0058 - Precision: 0.9975 - Recall: 0.4469 - Accuracy: 0.4472
+
+Optimal Threshold: 0.8500 - F1-score: 0.0085 - Precision: 0.0055 - Recall: 0.0181
+
+[[6979336   62849]
+ [  18969     350]]
+F1-score: 0.9942 - F1-score No Def: 0.9942 - F1-score Def: 0.0085 - Precision: 0.9973 - Recall: 0.9911 - Accuracy: 0.9884
+
+
+Exp 27 --> All features - county_data
+[4, 7, 64, 64]
+
+[[2565643 4476542]
+ [   5368   13951]]
+F1-score: 0.5338 - F1-score No Def: 0.5338 - F1-score Def: 0.0062 - Precision: 0.9979 - Recall: 0.3643 - Accuracy: 0.3653
+
+Optimal Threshold: 0.8000 - F1-score: 0.0122 - Precision: 0.0070 - Recall: 0.0493
+
+[[6906243  135942]
+ [  18367     952]]
+F1-score: 0.9890 - F1-score No Def: 0.9890 - F1-score Def: 0.0122 - Precision: 0.9973 - Recall: 0.9807 - Accuracy: 0.9781
+
+Exp 28 --> All features - county_data - counties_defor
+
+[[4422374 2619811]
+ [  11242    8077]]
+F1-score: 0.7707 - F1-score No Def: 0.7707 - F1-score Def: 0.0061 - Precision: 0.9975 - Recall: 0.6280 - Accuracy: 0.6274
+
+Optimal Threshold: 0.6500 - F1-score: 0.0117 - Precision: 0.0064 - Recall: 0.0610
+
+[[6860659  181526]
+ [  18141    1178]]
+F1-score: 0.9857 - F1-score No Def: 0.9857 - F1-score Def: 0.0117 - Precision: 0.9974 - Recall: 0.9742 - Accuracy: 0.9717
+
+Exp 29 --> All features - county_data - counties_defor - precip_time_grid
+
+[[6499513  542672]
+ [  17615    1704]]
+F1-score: 0.9587 - F1-score No Def: 0.9587 - F1-score Def: 0.0060 - Precision: 0.9973 - Recall: 0.9229 - Accuracy: 0.9207
+
+Optimal Threshold: 0.5500 - F1-score: 0.0075 - Precision: 0.0043 - Recall: 0.0278
+
+[[6918542  123643]
+ [  18781     538]]
+F1-score: 0.9898 - F1-score No Def: 0.9898 - F1-score Def: 0.0075 - Precision: 0.9973 - Recall: 0.9824 - Accuracy: 0.9798
+
+Exp 30 --> All features - county_data - counties_defor - precip_time_grid - tpi_array
+
+[[ 817055 6225130]
+ [   3926   15393]]
+F1-score: 0.2078 - F1-score No Def: 0.2078 - F1-score Def: 0.0049 - Precision: 0.9952 - Recall: 0.1160 - Accuracy: 0.1179
+
+Optimal Threshold: 0.8000 - F1-score: 0.0272 - Precision: 0.0169 - Recall: 0.0693
+
+[[6964406   77779]
+ [  17981    1338]]
+F1-score: 0.9932 - F1-score No Def: 0.9932 - F1-score Def: 0.0272 - Precision: 0.9974 - Recall: 0.9890 - Accuracy: 0.9864
+
+Exp 31 --> All features - county_data - counties_defor - precip_time_grid - tpi_array - past scores
+
+[[ 406996 6635189]
+ [   1479   17840]]
+F1-score: 0.1093 - F1-score No Def: 0.1093 - F1-score Def: 0.0053 - Precision: 0.9964 - Recall: 0.0578 - Accuracy: 0.0602
+
+Optimal Threshold: 0.7500 - F1-score: 0.0091 - Precision: 0.0049 - Recall: 0.0593
+
+[[6811022  231163]
+ [  18174    1145]]
+F1-score: 0.9820 - F1-score No Def: 0.9820 - F1-score Def: 0.0091 - Precision: 0.9973 - Recall: 0.9672 - Accuracy: 0.9647
+
+Exp 32 --> All features - county_data - counties_defor - precip_time_grid - tpi_array - past scores - night light
+
+[[1125885 5916300]
+ [   5380   13939]]
+F1-score: 0.2755 - F1-score No Def: 0.2755 - F1-score Def: 0.0047 - Precision: 0.9952 - Recall: 0.1599 - Accuracy: 0.1614
+
+Optimal Threshold: 0.9000 - F1-score: 0.0262 - Precision: 0.0159 - Recall: 0.0742
+
+[[6953680   88505]
+ [  17885    1434]]
+F1-score: 0.9924 - F1-score No Def: 0.9924 - F1-score Def: 0.0262 - Precision: 0.9974 - Recall: 0.9874 - Accuracy: 0.9849
+
