@@ -119,7 +119,7 @@ def precision_recall_curve(thresholds, y_true, y_proba):
     precision_values = []
     recall_values = []
 
-    for threshold in tqdm(thresholds):
+    for threshold in tqdm(thresholds, desc='PrecisionxRecall'):
         y_pred = (y_proba >= threshold).astype(int)
         # precision = Precision(y_pred, y_true)
         # recall = Recall(y_pred, y_true)

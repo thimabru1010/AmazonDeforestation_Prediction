@@ -9,6 +9,14 @@ from openstl.utils import reduce_tensor
 from .base_method import Base_method
 from segmentation_models_pytorch.losses import FocalLoss
 
+# def weighted_mse_loss(input, target, weight):
+#     return (weight * (input - target) ** 2)
+
+class weighted_MSELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self, inputs, targets, weights):
+        return ((inputs - targets)**2 ) * weights
 
 class SimVP(Base_method):
     r"""SimVP
@@ -25,14 +33,16 @@ class SimVP(Base_method):
         self.model_optim, self.scheduler, self.by_epoch = self._init_optimizer(steps_per_epoch)
         if nclasses is None:
             self.criterion = nn.MSELoss()
+            # self.criterion = weighted_MSELoss()
             
+        args.loss = None
         if args.loss == 'ce':
             if args.loss_weights is not None:
                 self.criterion = nn.CrossEntropyLoss(weight=torch.Tensor(args.loss_weights).to(device), ignore_index=50)
             else:
                 self.criterion = nn.CrossEntropyLoss(ignore_index=50)
         elif args.loss == 'focal':
-            self.criterion = FocalLoss("multiclass", gamma=3, ignore_index=50).to(device)
+            self.criterion = FocalLoss("multiclass", gamma=5).to(device)
             # self.criterion = FocalLoss("binary", gamma=3, ignore_index=50).to(device)
         
     def _build_model(self, args):
@@ -101,17 +111,12 @@ class SimVP(Base_method):
                 #! ALTERADO
                 # print('DEBUG train_one_epoch')
                 # print(pred_y.shape, batch_y.shape)
-                B, T, C, H, W = pred_y.shape
-                pred_y = pred_y.reshape(B, -1, H, W)
-                batch_y = batch_y.reshape(B, -1, H, W)[:, 0]
-                # print(pred_y.shape, batch_y.shape)
-                # print(pred_y)
-                # loss = 0
-                # window_size = batch_y.shape[1]
-                # for deep_slice in range(self.nclasses):
-                    # loss += self.criterion(pred_y[:, deep_slice*window_size:(deep_slice+1)*window_size], batch_y[:, deep_slice].type(torch.cuda.LongTensor))
-                # loss /= self.nclasses
-                loss = self.criterion(pred_y.contiguous() , batch_y.long().contiguous() )
+                # B, T, C, H, W = pred_y.shape
+                # pred_y = pred_y.reshape(B, -1, H, W)
+                # batch_y = batch_y.reshape(B, -1, H, W)[:, 0]
+                # loss = self.criterion(pred_y.contiguous() , batch_y.long().contiguous() )
+                # weights = [0]
+                loss = self.criterion(pred_y, batch_y)
 
             if not self.dist:
                 losses_m.update(loss.item(), batch_x.size(0))

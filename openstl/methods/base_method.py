@@ -178,10 +178,11 @@ class Base_method(object):
                                      data_loader.dataset.mean, data_loader.dataset.std,
                                      metrics=self.metric_list, spatial_norm=self.spatial_norm, return_log=False)
                 #!Alterado
-                B, T, C, H, W = pred_y.shape
-                pred_y = pred_y.reshape(B, -1, H, W)
-                batch_y = batch_y.reshape(B, -1, H, W)[:, 0]
-                eval_res['loss'] = self.criterion(pred_y.contiguous(), batch_y.long().contiguous()).cpu().numpy()
+                # B, T, C, H, W = pred_y.shape
+                # pred_y = pred_y.reshape(B, -1, H, W)
+                # batch_y = batch_y.reshape(B, -1, H, W)[:, 0]
+                # eval_res['loss'] = self.criterion(pred_y.contiguous(), batch_y.long().contiguous()).cpu().numpy()
+                eval_res['loss'] = self.criterion(pred_y, batch_y).cpu().numpy()
                 for k in eval_res.keys():
                     if 'CM' in k:
                         continue

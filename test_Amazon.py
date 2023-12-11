@@ -81,7 +81,7 @@ def plot_videos_side_by_side(video1, video2, video3, output_gif_path):
     # plt.show()
 
 
-EX_NAME = 'custom_exp32'
+EX_NAME = 'custom_exp302_all'
 # root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/Dataset/DETR_Patches')
 img_path = Path('/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/test.tif')
 exp_path = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/work_dirs/{EX_NAME}')
@@ -100,11 +100,11 @@ custom_training_config = {
     'val_batch_size': batch_size,
     'epoch': 50,
     'lr': 1e-4,   
-    'metrics': ['acc', 'Recall', 'Precision', 'f1_score'],
+    'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score'],
 
     'ex_name': f'{EX_NAME}', # custom_exp
     'dataname': 'custom',
-    'in_shape': [4, 1, 64, 64], # T, C, H, W = self.args.in_shape
+    'in_shape': [4, 11, 64, 64], # T, C, H, W = self.args.in_shape
     'loss_weights': None,
     'early_stop_epoch': 10,
     'warmup_epoch': 0, #default = 0
@@ -136,15 +136,16 @@ if data_prep == 'giov':
     test_data, patches_sample_train, patches_sample_val, frames_idx, county_data, counties_time_grid, \
         precip_time_grid, tpi_array, scores_time_grid, night_time_grid = prep4dataset_test(config)
         
-    county_data = None
-    counties_time_grid = None
-    precip_time_grid = None
-    tpi_array = None
-    scores_time_grid = None
-    night_time_grid = None
+    counties_time_grid = None # county_defor
+    # county_data = None
+    # precip_time_grid = None
+    # tpi_array = None
+    # scores_time_grid = None
+    # night_time_grid = None
+    
     test_set = GiovanniDataset(
     test_data, 
-    patches_sample_train, 
+    patches_sample_val, 
     frames_idx, 
     county_data,
     counties_time_grid,
@@ -176,10 +177,10 @@ for attribute in default_values.keys():
     if config[attribute] is None:
         config[attribute] = default_values[attribute]
 
-exp = BaseExperiment(args, dataloaders=(dataloader_test, None, dataloader_test), nclasses=2)
+exp = BaseExperiment(args, dataloaders=(dataloader_test, None, dataloader_test))
 
 print('>'*35 + ' testing  ' + '<'*35)
-exp.test(classify=True)
+exp.test()
 
 #! Reconstruct predictions
 
@@ -198,23 +199,21 @@ if data_prep != 'giov':
 labels = np.load(exp_path / 'saved' / 'trues.npy')
 logits = np.load(exp_path / 'saved' / 'preds.npy')
 print(logits.shape)
-preds = F.softmax(torch.Tensor(logits), dim=2).numpy()
+# preds = F.softmax(torch.Tensor(logits), dim=2).numpy()
 # preds = F.sigmoid(torch.Tensor(logits)).numpy()
+preds = (logits >= 0.5)
 print('DEBUG Probs vs Logits')
 print(logits.max(), logits.min())
 print(preds.max(), preds.min())
 # trues = np.load(exp_path / 'saved' / 'trues.npy')
 
-# print(preds)
-print(preds.shape)
-# print(trues.shape)
-# original_shape = (11, 2368, 3008)
-window_size = 5
-
-preds0 = preds[:, :, 0]
-preds1 = preds[:, :, 1]
+# preds0 = preds[:, :, 0]
+# preds1 = preds[:, :, 1]
 # preds1 = preds[:, :, 0]
-preds_argmax = np.argmax(preds, axis=2)
+# preds_argmax = np.argmax(preds, axis=2)
+preds0 = logits
+preds1 = logits
+preds_argmax = preds
 # th = 0.55
 # preds_argmax = preds1.copy()
 # preds_argmax[preds1 >= th] = 1
@@ -231,7 +230,8 @@ print(f'F1-score: {f1_scre:.4f} - F1-score No Def: {f1_0:.4f} - F1-score Def: {f
 # Precision = def_metrics[:, 1]
 
 # Calculate precision-recall curve
-thresholds = list(np.arange(0, 1.05, 0.05))
+# thresholds = list(np.arange(0, 1.05, 0.05))
+thresholds = list(np.arange(logits.min(), logits.max(), 0.05))
 precision, recall, thresholds = precision_recall_curve(thresholds, labels.reshape(-1), preds1.reshape(-1))
 
 # Calculate F1 score for each threshold
@@ -288,6 +288,8 @@ plt.savefig(exp_path / 'saved' / 'classes_probs_hist.jpeg', dpi=300)
 # plt.show()
 
 if data_prep != 'giov':
+    # original_shape = (11, 2368, 3008)
+    window_size = 5
     img_recs = []
     for i, _pred in enumerate([preds0, preds1, preds_argmax]):
         img_rec = test_set.patches_reconstruction(_pred.reshape(-1, (12 - val_fill) - window_size + 1, 1, 64, 64))

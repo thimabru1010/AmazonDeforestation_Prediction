@@ -28,7 +28,7 @@ def apply_legal_amazon_mask(input_image: np.array, amazon_mask: np.array):
 root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/Dataset/DETR_Patches')
 
 print(root_dir)
-batch_size = 16
+batch_size = 32
 num_workers = 8
 Debug = False
 data_prep = 'giov'
@@ -39,12 +39,13 @@ if data_prep == 'giov':
     train_data, val_data, patches_sample_train, patches_sample_val, frames_idx, county_data, counties_time_grid, \
         precip_time_grid, tpi_array, scores_time_grid, night_time_grid = prep4dataset(config)
     
-    county_data = None
-    counties_time_grid = None
-    precip_time_grid = None
+    counties_time_grid = None # county_defor
     tpi_array = None
-    scores_time_grid = None
-    night_time_grid = None
+    # county_data = None
+    # precip_time_grid = None
+    # scores_time_grid = None
+    # night_time_grid = None
+    
     train_set = GiovanniDataset(
         train_data, 
         patches_sample_train, 
@@ -129,26 +130,29 @@ custom_training_config = {
     'total_length': 5,
     'batch_size': batch_size,
     'val_batch_size': batch_size,
-    'epoch': 15,
-    'lr': 1e-2,   
-    'metrics': ['acc', 'Recall', 'Precision', 'f1_score', 'CM'],
+    'epoch': 100,
+    'lr': 1e-3,
+    'final_div_factor': 	10000.0,   
+    'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score', 'CM'],
 
-    'ex_name': 'custom_exp32', # custom_exp
+    'ex_name': 'custom_exp304_Precip', # custom_exp
     'dataname': 'custom',
-    'in_shape': [4, 1, 64, 64], # T, C, H, W = self.args.in_shape
+    'in_shape': [4, 7, 64, 64], # T, C, H, W = self.args.in_shape
     'loss_weights': loss_weights,
-    'early_stop_epoch': 10,
-    'warmup_epoch': 0, #default = 0
-    'sched': 'step',
-    'decay_epoch': 3,
-    'decay_rate': 0.5,
-    'weight_decay': 1e-2,
-    'resume_from': None,
-    'auto_resume': False,
-    'test_time': False,
-    'seed': 1,
-    'loss': 'focal'
+    'weight_decay': 1e-4
 }
+#     'early_stop_epoch': 10,
+#     'warmup_epoch': 0, #default = 0
+#     'sched': 'step',
+#     'decay_epoch': 10,
+#     'decay_rate': 0.8,
+#     'weight_decay': 1e-2,
+#     'resume_from': None,
+#     'auto_resume': False,
+#     'test_time': False,
+#     'seed': 5,
+#     'loss': 'focal'
+# }
 
 custom_model_config = {
     # For MetaVP models, the most important hyperparameters are: 
@@ -179,7 +183,7 @@ for attribute in default_values.keys():
     if config[attribute] is None:
         config[attribute] = default_values[attribute]
 
-exp = BaseExperiment(args, dataloaders=(dataloader_train, dataloader_val, None), nclasses=2)
+exp = BaseExperiment(args, dataloaders=(dataloader_train, dataloader_val, None))
 
 #TODO: Botar weights na Cross Entropy para balancear os labels
 print('>'*35 + ' training ' + '<'*35)

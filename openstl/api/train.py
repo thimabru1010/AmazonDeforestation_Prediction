@@ -302,8 +302,8 @@ class BaseExperiment(object):
         early_stop = False
         self.call_hook('before_train_epoch')
         
-        print('DEBUG EARLY STOPPING')
-        print(self._early_stop, early_stop, self._max_epochs)
+        # print('DEBUG EARLY STOPPING')
+        # print(self._early_stop, early_stop, self._max_epochs)
 
         eta = 1.0  # PredRNN variants
         for epoch in range(self._epoch, self._max_epochs):
@@ -325,6 +325,12 @@ class BaseExperiment(object):
                     print_log('Epoch: {0}, Steps: {1} | Lr: {2:.7f} | Train Loss: {3:.7f} | Vali Loss: {4:.7f}\n'.format(
                         epoch + 1, len(self.train_loader), cur_lr, loss_mean.avg, vali_loss))
                     early_stop = recorder(vali_loss, self.method.model, self.path)
+                    if early_stop:
+                        print('Early Stopping...')
+                        break
+                    # print('DEBUG EARLY STOP')
+                    # print(early_stop)
+                    # 1/0
                     self._save(name='latest')
             if self._use_gpu and self.args.empty_cache:
                 torch.cuda.empty_cache()
@@ -338,7 +344,7 @@ class BaseExperiment(object):
         time.sleep(1)  # wait for some hooks like loggers to finish
         self.call_hook('after_run')
 
-    def vali(self, classify=True):
+    def vali(self, classify=False):
         """A validation loop during training"""
         self.call_hook('before_val_epoch')
         results, eval_log = self.method.vali_one_epoch(self, self.vali_loader)
@@ -354,7 +360,7 @@ class BaseExperiment(object):
 
         return results['loss'].mean()
 
-    def test(self, classify=True):
+    def test(self):
         """A testing loop of STL methods"""
         if self.args.test:
             best_model_path = osp.join(self.path, 'checkpoint.pth')
@@ -363,10 +369,6 @@ class BaseExperiment(object):
         self.call_hook('before_val_epoch')
         results = self.method.test_one_epoch(self, self.test_loader)
         self.call_hook('after_val_epoch')
-        # print(results)
-        
-        # if classify:
-        #     results['preds'] = F.log_softmax(results['preds'])
 
         if 'weather' in self.args.dataname:
             metric_list, spatial_norm = self.args.metrics, True

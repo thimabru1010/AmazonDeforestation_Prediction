@@ -23,11 +23,14 @@ class SimVP_Model(nn.Module):
         H, W = int(H / 2**(N_S/2)), int(W / 2**(N_S/2))  # downsample 1 / 2**(N_S/2)
         act_inplace = False
         self.enc = Encoder(C, hid_S, N_S, spatio_kernel_enc, act_inplace=act_inplace)
+        print('DEBUG')
+        print(nclasses)
         #! Alterado
         if nclasses:
             self.dec = Decoder(hid_S, nclasses, N_S, spatio_kernel_dec, act_inplace=act_inplace)
         else:
-            self.dec = Decoder(hid_S, C, N_S, spatio_kernel_dec, act_inplace=act_inplace)
+            self.dec = Decoder(hid_S, 1, N_S, spatio_kernel_dec, act_inplace=act_inplace)
+            # self.dec = Decoder(hid_S, C, N_S, spatio_kernel_dec, act_inplace=act_inplace)
 
         model_type = 'gsta' if model_type is None else model_type.lower()
         if model_type == 'incepu':
@@ -49,10 +52,10 @@ class SimVP_Model(nn.Module):
         hid = hid.reshape(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)
-        # print(Y.shape)
-        # Y = F.log_softmax(Y)
+        # Y = torch.sigmoid(Y)
         #! ALTERADO
         # print('DEBUG SimVP_Model Forward')
+        # print(B, T, C, H, W)
         # print(Y.shape)
         Y = Y.reshape(B, T, -1, H, W)
         # print(Y.shape)

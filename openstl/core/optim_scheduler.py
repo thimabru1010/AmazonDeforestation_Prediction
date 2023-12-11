@@ -127,6 +127,7 @@ def get_optim_scheduler(args, epoch, model, steps_per_epoch):
     sched_lower = args.sched.lower()
     total_steps = epoch * steps_per_epoch
     by_epoch = True
+    print(args.lr)
     if sched_lower == 'onecycle':
         lr_scheduler = optim.lr_scheduler.OneCycleLR(
             optimizer,

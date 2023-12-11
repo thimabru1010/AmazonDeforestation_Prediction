@@ -271,16 +271,21 @@ def normalize(county_data, counties_time_grid, train_time_idx, precip_time_grid,
     night_means = np.stack(night_means, axis=0)
     night_stds = np.stack(night_stds, axis=0)
     
-    np.save(save_path / 'population.npy', [pop_median, pop_std, den_median, den_std])
-    np.save(save_path / 'counties.npy', [counties_tg_mean, counties_tg_std])
-    np.save(save_path / 'precip.npy', [precip_tg_mean, precip_tg_std])
-    np.save(save_path / 'tpi.npy', [tpi_means, tpi_stds])
-    np.save(save_path / 'night.npy', [night_means, night_stds])
+    # np.save(save_path / 'population.npy', [pop_median, pop_std, den_median, den_std])
+    # np.save(save_path / 'counties.npy', [counties_tg_mean, counties_tg_std])
+    # np.save(save_path / 'precip.npy', [precip_tg_mean, precip_tg_std])
+    # np.save(save_path / 'tpi.npy', [tpi_means, tpi_stds])
+    # np.save(save_path / 'night.npy', [night_means, night_stds])
     return county_data, counties_time_grid, precip_time_grid, tpi_array, night_time_grid
 
 def prep4dataset(config):
     am_bounds, frames_idx, deforestation, frames_county, counties_defor, precip, tpi, past_scores, night_light = load_data(config)
     time_grid, county_data, counties_time_grid, precip_time_grid, tpi_array, scores_time_grid, night_time_grid = create_grids(am_bounds, frames_idx, deforestation, frames_county, counties_defor, precip, tpi, past_scores, night_light)
+    #! Normalizing DETER warnings by mean and std 
+    for i in range(time_grid.shape[0]):
+        time_grid_mean = time_grid[i, :, :].mean()
+        time_grid_std = time_grid[i, :, :].std()
+        time_grid[i, :, :] = (time_grid[i, :, :] - time_grid_mean) / time_grid_std
     train_time_idx = range(12)
     val_time_idx = range(12, 20)
     # test_time_idx = range(20,28) #! Not used yet
@@ -299,6 +304,11 @@ def prep4dataset(config):
 def prep4dataset_test(config):
     am_bounds, frames_idx, deforestation, frames_county, counties_defor, precip, tpi, past_scores, night_light = load_data(config)
     time_grid, county_data, counties_time_grid, precip_time_grid, tpi_array, scores_time_grid, night_time_grid = create_grids(am_bounds, frames_idx, deforestation, frames_county, counties_defor, precip, tpi, past_scores, night_light)
+    #! Normalizing DETER warnings by mean and std 
+    for i in range(time_grid.shape[0]):
+        time_grid_mean = time_grid[i, :, :].mean()
+        time_grid_std = time_grid[i, :, :].std()
+        time_grid[i, :, :] = (time_grid[i, :, :] - time_grid_mean) / time_grid_std
     train_time_idx = range(12)
     test_time_idx = range(20,28)
     test_data = time_grid[test_time_idx, :, :]
