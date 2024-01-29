@@ -156,9 +156,6 @@ class GiovanniDataset(Dataset):
         labels[0, :, :] = 1
         labels[0, :, :][target_idx] = 0
         labels[1, :, :][target_idx] = 1
-        # labels[:, :] = 1
-        # labels[target_idx] = 1
-        # labels[np.bitwise_not(target_idx)] = 0
         labels = torch.tensor(labels).float()# .to(self.device)
         # print('DEBUG')
         # print(labels.shape)

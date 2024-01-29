@@ -324,7 +324,7 @@ class BaseExperiment(object):
                 if self._rank == 0:
                     print_log('Epoch: {0}, Steps: {1} | Lr: {2:.7f} | Train Loss: {3:.7f} | Vali Loss: {4:.7f}\n'.format(
                         epoch + 1, len(self.train_loader), cur_lr, loss_mean.avg, vali_loss))
-                    early_stop = recorder(vali_loss, self.method.model, self.path)
+                    early_stop = recorder(vali_loss, self.method.model, self.path, early_stop=True)
                     if early_stop:
                         print('Early Stopping...')
                         break
@@ -406,3 +406,11 @@ class BaseExperiment(object):
                 np.save(osp.join(folder_path, np_data + '.npy'), results[np_data])
 
         return eval_res['acc']
+    
+    def load_model(self):
+        best_model_path = osp.join(self.path, 'checkpoint.pth')
+        self._load_from_state_dict(torch.load(best_model_path))
+        
+    def infer_one_image(self, input_img):
+        input_img = torch.Tensor(input_img).to(self.device)
+        return self.method._predict(input_img)

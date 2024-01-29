@@ -50,13 +50,6 @@ class SimVP(Base_method):
 
     def _predict(self, batch_x, batch_y=None, classify=True, **kwargs):
         """Forward the model"""
-        # if classify:
-        #     pred_y = self.model(batch_x)
-        #     preds = []
-        #     for i in range(true.shape[2]):
-        #         preds.append(np.argmax(pred[:, :, i:i+true.shape[2]], axis=2))
-        #     # pred = np.argmax(pred, axis=2)
-        #     pred = np.stack(preds, axis=2).reshape(-1)
 
         if self.args.aft_seq_length == self.args.pre_seq_length:
             pred_y = self.model(batch_x)

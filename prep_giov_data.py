@@ -173,6 +173,9 @@ def compute_frame_patches(frames_idx, deforestation, out_condition='both'):
                 out_of_borders_frames = len(set(iframes.index) - set(deforestation["frame_id"].values))
                 if (out_of_borders_frames < len(iframes)) and (iframes["in_borders"].mean() >= 0.5):
                     patches.append(iframes.index)
+            
+            elif out_condition == "None":
+                patches.append(iframes.index)
     return patches
 
 def apply_normalization(county_data, counties_time_grid, train_time_idx, precip_time_grid, tpi_array, night_time_grid, norm_path):
@@ -315,7 +318,7 @@ def prep4dataset_test(config):
     norm_path = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/data_Features/data/trusted')
     # county_data, counties_time_grid, precip_time_grid, tpi_array, night_time_grid = apply_normalization(county_data, counties_time_grid, test_time_idx, precip_time_grid, tpi_array, night_time_grid, norm_path)
     county_data, counties_time_grid, precip_time_grid, tpi_array, night_time_grid = normalize(county_data, counties_time_grid, train_time_idx, precip_time_grid, tpi_array, night_time_grid, norm_path)
-    patches = compute_frame_patches(frames_idx, deforestation, out_condition='both')
+    patches = compute_frame_patches(frames_idx, deforestation, out_condition='None')
     # remove patches that represent reduced regions
     patches = [b for b in patches if (len(b)==len(patches[0]))]
     patches_sample_train = patches
