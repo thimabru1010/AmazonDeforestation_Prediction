@@ -52,13 +52,13 @@ class SimVP_Model(nn.Module):
         hid = hid.reshape(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)
-        # Y = torch.sigmoid(Y)
         #! ALTERADO
         # print('DEBUG SimVP_Model Forward')
         # print(B, T, C, H, W)
         # print(Y.shape)
         Y = Y.reshape(B, T, -1, H, W)
         # print(Y.shape)
+        # 1/0
         # Y = Y.reshape(B, T, C, H, W)
         # print(Y.shape)
         return Y

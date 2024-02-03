@@ -445,7 +445,6 @@ if __name__=='__main__':
     county_data, counties_time_grid, precip_time_grid, tpi_array, night_time_grid = normalize(county_data, counties_time_grid, train_time_idx, precip_time_grid, tpi_array, night_time_grid, save_path)
     
     print(time_grid.shape, county_data.shape, counties_time_grid.shape, precip_time_grid.shape, tpi_array.shape, scores_time_grid.shape, night_time_grid.shape)
-    1/0
     mask_path = '/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/area.tif'
     mask = load_tif_image(mask_path)
     print(mask.shape)
@@ -498,7 +497,6 @@ if __name__=='__main__':
 
     # # Show the figure (optional)
     # plt.show()
-    1/0
     patches = compute_frame_patches(frames_idx, deforestation, out_condition='both')
 
     # remove patches that represent reduced regions

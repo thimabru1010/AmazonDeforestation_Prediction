@@ -75,7 +75,7 @@ class SimVP(Base_method):
 
             if m != 0:
                 cur_seq = self.model(cur_seq)
-                pred_y.append(cur_seq[:, :m]) #???
+                pred_y.append(cur_seq[:, :m])
             
             pred_y = torch.cat(pred_y, dim=1)
         return pred_y

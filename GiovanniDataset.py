@@ -64,7 +64,7 @@ class GiovanniDataset(Dataset):
         
         # def_deter = input_matrix.copy()
         # print('DEBUG GIOVANI DATASET')
-        input_matrix[input_matrix > 1e-7] += 0.5
+        # input_matrix[input_matrix > 1e-7] += 0.5
         # input_matrix[input_matrix <= 1e-7] = 0
         
         input_matrix = np.expand_dims(input_matrix, axis=1)
@@ -138,30 +138,35 @@ class GiovanniDataset(Dataset):
         data = torch.tensor(input_matrix).float() #.to(self.device)
 
         # get output
-        labels = np.zeros(
-            (   2,
-                idx_frames["x"].max()-idx_frames["x"].min() + 1, 
-                idx_frames["y"].max()-idx_frames["y"].min() + 1
-            )
-        )
+        # labels = np.zeros(
+        #     (   2,
+        #         idx_frames["x"].max()-idx_frames["x"].min() + 1, 
+        #         idx_frames["y"].max()-idx_frames["y"].min() + 1
+        #     )
+        # )
         # print(idx_frames["x"].max()-idx_frames["x"].min() + 1, idx_frames["y"].max()-idx_frames["y"].min() + 1)
         # 1/0
-        target_idx = np.where(
-            self.X[
+        # target_idx = np.where(
+        #     self.X[
+        #         idx_time+self.autor_window, 
+        #         idx_frames["x"].min()-self.ix:idx_frames["x"].max()-self.ix+1, 
+        #         idx_frames["y"].min()-self.iy:idx_frames["y"].max()-self.iy+1
+        #     ] > 1e-7
+        # )
+        
+        labels = self.X[
                 idx_time+self.autor_window, 
                 idx_frames["x"].min()-self.ix:idx_frames["x"].max()-self.ix+1, 
                 idx_frames["y"].min()-self.iy:idx_frames["y"].max()-self.iy+1
-            ] > 1e-7
-        )
-        labels[0, :, :] = 1
-        labels[0, :, :][target_idx] = 0
-        labels[1, :, :][target_idx] = 1
+            ]
+        # labels[0, :, :] = 1
+        # labels[0, :, :][target_idx] = 0
+        # labels[1, :, :][target_idx] = 1
         labels = torch.tensor(labels).float()# .to(self.device)
         # print('DEBUG')
         # print(labels.shape)
         # print(labels.unsqueeze(0).shape)
         # print(data.shape)
         # 1/0
-        # print('DEBUG GIOVANNI DATASET 2')
-        # print(data.shape, labels.shape)
-        return data, labels[1].unsqueeze(0).unsqueeze(0)
+        # return data, labels.unsqueeze(0).unsqueeze(0)
+        return data, labels.unsqueeze(0).unsqueeze(0)
