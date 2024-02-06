@@ -4,7 +4,7 @@ from AmazonDataset import CustomDataset
 from GiovanniDataset import GiovanniDataset
 from pathlib import Path
 import numpy as np
-from openstl.api import BaseExperiment
+# from openstl.api import BaseExperiment
 from openstl.utils import create_parser, default_parser
 from osgeo import gdal
 import json
@@ -14,6 +14,7 @@ import pandas as pd
 import geopandas as gpd
 import GiovConfig as config
 from prep_giov_data import prep4dataset
+from BaseExperiment import BaseExperiment
 
 def load_tif_image(tif_path):
     gdal_header = gdal.Open(str(tif_path))
@@ -143,18 +144,6 @@ custom_training_config = {
     'loss_weights': loss_weights,
     'weight_decay': 1e-4
 }
-#     'early_stop_epoch': 10,
-#     'warmup_epoch': 0, #default = 0
-#     'sched': 'step',
-#     'decay_epoch': 10,
-#     'decay_rate': 0.8,
-#     'weight_decay': 1e-2,
-#     'resume_from': None,
-#     'auto_resume': False,
-#     'test_time': False,
-#     'seed': 5,
-#     'loss': 'focal'
-# }
 
 custom_model_config = {
     # For MetaVP models, the most important hyperparameters are: 
@@ -166,8 +155,11 @@ custom_model_config = {
     # Here, we directly set these parameters
     'model_type': 'gSTA',
     'N_S': 4,
-    'N_T': 8,
-    'hid_S': 64, # default: 64
+    'N_T': 4,
+    'hid_S': 16, # default: 64
     'hid_T': 256 # default: 256
 }
-    
+
+exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
+
+exp.train()

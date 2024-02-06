@@ -19,6 +19,8 @@ class SimVP_Model(nn.Module):
                  mlp_ratio=8., drop=0.0, drop_path=0.0, spatio_kernel_enc=3,
                  spatio_kernel_dec=3, act_inplace=True, nclasses=None, **kwargs):
         super(SimVP_Model, self).__init__()
+        
+        print(hid_S, hid_T)
         T, C, H, W = in_shape  # T is pre_seq_length
         H, W = int(H / 2**(N_S/2)), int(W / 2**(N_S/2))  # downsample 1 / 2**(N_S/2)
         act_inplace = False
