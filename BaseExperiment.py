@@ -5,46 +5,63 @@ from segmentation_models_pytorch.losses import FocalLoss
 import torch.nn as nn
 import torch.optim as optm
 import os
-# from metrics import 
+from metrics import confusion_matrix, f1_score
+import numpy as np
+import torch.nn.functional as F
+
+from sklearn.metrics import f1_score as skf1_score
+
+def weighted_mse_loss(y_pred, y_true, weights):
+    return torch.mean(weights * (y_pred - y_true) ** 2)
 
 class BaseExperiment():
     def __init__(self, trainloader, valloader, custom_model_config, custom_training_config):
+        # TODO: wrap into a function to create work dir
+        # Create work dir
+        self.work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
+        if not os.path.exists(self.work_dir_path):
+            os.makedirs(self.work_dir_path)
+            
         self.epochs = custom_training_config['epoch']
         self.patience = custom_training_config['patience']
         self.device = "cuda:0"
         in_shape = (4, 1, 64, 64)
         self.model = self._build_model(in_shape, 2, custom_model_config)
-        # self.model = SimVP_Model(in_shape=in_shape, nclasses=2).to(self.device)
         
         self.optm = optm.Adam(self.model.parameters(), lr=custom_training_config['lr'])
         
         # self.loss = nn.CrossEntropyLoss(weight=torch.Tensor(oss_weights).to(device), ignore_index=50)
         # self.loss = nn.CrossEntropyLoss()
-        self.loss = FocalLoss("binary", gamma=3).to(self.device)
+        # self.loss = FocalLoss("binary", gamma=5).to(self.device)
+        # self.loss = FocalLoss("multiclass", gamma=10).to(self.device)
+        # TODO: try to weight MSE loss
+        self.loss = nn.MSELoss()
         
         self.trainloader = trainloader
         self.valloader = valloader
-        
-        # Create work dir
-        self.work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
-        if not os.path.exists(self.work_dir_path):
-            os.makedirs(self.work_dir_path)
         
     def _build_model(self, in_shape, nclasses, custom_model_config):
         return SimVP_Model(in_shape=in_shape, nclasses=nclasses, **custom_model_config).to(self.device)
     
     def train_one_epoch(self):
         train_loss = 0
+        self.model.train(True)
         for inputs, labels in tqdm(self.trainloader):
             # print(inputs.shape)
+            
+            # Zero your gradients for every batch!
+            self.optm.zero_grad()
+            
             y_pred = self.model(inputs.to(self.device))
             # Get only the first temporal channel
             y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
             
-            loss = self.loss(y_pred=y_pred, y_true=labels.to(self.device))
-            
-            self.optm.zero_grad()
+            # print(y_pred.shape)
+            # print(labels.shape)
+            loss = self.loss(y_pred=y_pred[:, 0], y_true=labels.to(self.device)[:, 0, 1])
             loss.backward()
+            
+            # Adjust learning weights
             self.optm.step()
             
             train_loss += loss.detach()
@@ -54,16 +71,48 @@ class BaseExperiment():
 
     def validate_one_epoch(self):
         val_loss = 0
-        for inputs, labels in tqdm(self.valloader):
-            y_pred = self.model(inputs.to(self.device))
-            # Get only the first temporal channel
-            y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
-            loss = self.loss(y_pred=y_pred, y_true=labels.to(self.device))
+        f1_clss0 = 0
+        f1_clss1 = 0
+        skf1 = 0
+        cm = np.zeros((2, 2), dtype=int)
+        self.model.eval()
+        # Disable gradient computation and reduce memory consumption.
+        with torch.no_grad():
+            for inputs, labels in tqdm(self.valloader):
+                y_pred = self.model(inputs.to(self.device))
+                # Get only the first temporal channel
+                y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
+                loss = self.loss(y_pred=y_pred[:, 0], y_true=labels.to(self.device)[:, 0, 1])
+                
+                #TODO: compute other classification metrics
+                _y_pred = torch.argmax(F.softmax(y_pred, dim=2), dim=2).cpu().numpy()[:, 0]
+                # _labels = torch.argmax(labels).detach().numpy()
+                _labels = labels.detach().numpy()[:, 0, 1]
+                # print(_labels.shape)
+                # print(_y_pred.shape)
+                # 1/0
+                _skf1 = skf1_score(_y_pred.reshape(-1), _labels.reshape(-1))
+                _f1_clss0, _f1_clss1 = f1_score(_y_pred, _labels)
+                _cm, _, _, _, _ = confusion_matrix(_labels, _y_pred)
+                
+                val_loss += loss.detach()
+                f1_clss0 += _f1_clss0.item()
+                f1_clss1 += _f1_clss1.item()
+                skf1 += _skf1.item()
+                cm[0, 0] += _cm[0, 0]
+                cm[0, 1] += _cm[0, 1]
+                cm[1, 0] += _cm[1, 0]
+                cm[1, 1] += _cm[1, 1]
             
-            #TODO: compute other classification metrics
-            
-            val_loss += loss.detach()
         val_loss = val_loss / len(self.valloader)
+        f1_clss0 = f1_clss0 / len(self.valloader)
+        f1_clss1 = f1_clss1 / len(self.valloader)
+        skf1 = skf1 / len(self.valloader)
+        
+        print("====== Confusion Matrix ======")
+        print(cm)
+        print(skf1)
+        print(f'F1 Score No def: {f1_clss0:.4f} - F1 Score Def: {f1_clss1:.4f}')
         
         return val_loss
     
@@ -73,7 +122,7 @@ class BaseExperiment():
         for epoch in range(self.epochs):
             
             train_loss = self.train_one_epoch()
-          
+            
             val_loss = self.validate_one_epoch()
             
             if val_loss < min_val_loss:
@@ -89,7 +138,47 @@ class BaseExperiment():
                 break
             
             print(f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}")
+
+def _build_model(in_shape, nclasses, custom_model_config):
+    return SimVP_Model(in_shape=in_shape, nclasses=nclasses, **custom_model_config).to(self.device)
+        
+def test_model(testloader, custom_training_config, custom_model_config):
+    work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
+    device = "cuda:0"
+    in_shape = (4, 1, 64, 64)
+        
+    model = _build_model(in_shape, 2, custom_model_config)
+    model.load_state_dict(os.path.join(work_dir_path, 'checkpoint.pth')).to(device)
+    model.eval()
     
-    def test(self, testloader):
+    cm = np.zeros((2, 2), dtype=int)
+    # Disable gradient computation and reduce memory consumption.
+    with torch.no_grad():
         for inputs, labels in tqdm(testloader):
-            pass
+            y_pred = model(inputs.to(device))
+            # Get only the first temporal channel
+            y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
+            
+            #TODO: compute other classification metrics
+            _y_pred = torch.argmax(F.softmax(y_pred, dim=2), dim=2).cpu().numpy()[:, 0]
+            # _labels = torch.argmax(labels).detach().numpy()
+            _labels = labels.detach().numpy()[:, 0, 1]
+            # print(_labels.shape)
+            # print(_y_pred.shape)
+            # 1/0
+            _f1_clss0, _f1_clss1 = f1_score(_y_pred, _labels)
+            _cm, _, _, _, _ = confusion_matrix(_labels, _y_pred)
+            
+            f1_clss0 += _f1_clss0.item()
+            f1_clss1 += _f1_clss1.item()
+            cm[0, 0] += _cm[0, 0]
+            cm[0, 1] += _cm[0, 1]
+            cm[1, 0] += _cm[1, 0]
+            cm[1, 1] += _cm[1, 1]
+        
+    f1_clss0 = f1_clss0 / len(testloader)
+    f1_clss1 = f1_clss1 / len(testloader)
+    
+    print("====== Confusion Matrix ======")
+    print(cm)
+    print(f'F1 Score No def: {f1_clss0:.4f} - F1 Score Def: {f1_clss1:.4f}')

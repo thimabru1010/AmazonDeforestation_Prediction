@@ -4,11 +4,13 @@ from torch.utils.data import Dataset
 import torch.nn.functional as F
 import os
 import numpy as np
+import pandas as pd
 from pathlib import Path
 from preprocess import load_tif_image
 from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+from sklearn.model_selection import train_test_split
 
 class CustomDataset(Dataset):
     def __init__(self, root_dir: Path, normalize: bool=False, transform: torchvision.transforms=None,
@@ -65,7 +67,7 @@ class CustomDataset(Dataset):
         # print(data.shape)
         # 1/0
         return data, labels
-    
+#! ------------------------------------------------------------------------------------------------------------------------    
     
 class CustomDataset_Test(Dataset):
     def __init__(self, img_path: Path, normalize: bool=False, transform: torchvision.transforms=None,
@@ -185,3 +187,88 @@ class CustomDataset_Test(Dataset):
         print('Reconstruction Done!')
         # Cut expanded image in original shape
         return img_reconstructed[:, :self.original_shape[1], :self.original_shape[2]]
+#! ------------------------------------------------------------------------------------------------------------------------
+
+class IbamaInpe25km_Dataset(Dataset):
+    def __init__(self, root_dir: Path, normalize: bool=False, transform: torchvision.transforms=None,
+                Debug: bool=False):
+        super(IbamaInpe25km_Dataset, self).__init__()
+        self.root_dir = root_dir
+
+        # self.ibama_files = os.listdir(root_dir / 'Geotiff-IBAMA_resampled')
+        self.inpe_files = os.listdir(root_dir / 'Geotiff-INPE/tiffs')
+        # print(len(self.ibama_files), len(self.inpe_files))
+        print(len(self.inpe_files))
+        # Filter string to select files with 'ArCS' in the name
+        self.arcs_files = list(filter(lambda x: 'ArCS' in x, self.inpe_files))
+        self.arcs_files.remove('ArCS.tif')
+        self.dear_files = list(filter(lambda x: 'DeAr' in x, self.inpe_files))
+        self.dear_files.remove('DeAr.tif')
+        print(len(self.arcs_files), len(self.dear_files))
+        self.data_files = self.arcs_files
+        # TODO create temporal windows sliding over the months
+        self.data_files.sort()
+        print(self.data_files)
+        func = lambda x: x.split('.tif')[0][4:]
+        date_files = [func(file) for file in self.data_files]
+        print(date_files)
+        df_date = pd.DataFrame(date_files, columns=['date_str'])
+        df_date['date'] = pd.to_datetime(df_date['date_str'], format="%d%m%y")
+        df_date = df_date.sort_values(by='date')
+        self.data_files = self.sliding_window(df_date.date, 3)
+
+        
+        self.data_files, self.val_set = train_test_split(self.data_files, test_size=0.2, random_state=42)
+        self.mean, self.std = self._get_mean_std()
+        
+        if Debug:
+            self.data_files = self.data_files[:20]
+            
+        self.normalize = normalize
+        self.transform = transform
+
+    def get_validation_set(self):
+        return self.val_files
+    
+    def _get_mean_std(self):
+        '''Get mean and std of the dataset'''
+        for i, file in enumerate(self.data_files):
+            img = load_tif_image(self.root_dir / 'Geotiff-INPE/tiffs' / file)
+            if i == 0:
+                data = np.expand_dims(img, axis=0)
+            else:
+                data = np.concatenate((data, np.expand_dims(img, axis=0)), axis=0)
+        print(data.shape)
+        # Calculates the mean and std only for amazon pixels (Excluding the background)
+        data[data < -1e38] = -1
+        data = data[data != -1]
+        print(data.shape)
+        mean = data.mean(axis=0)
+        std = data.std(axis=0)
+        print('Mean:', mean, 'Std:', std)
+        return mean, std
+    
+    def sliding_window(self, input_list, window_size):
+        result = []
+        for i in range(len(input_list) - window_size + 1):
+            window = input_list[i:i + window_size]
+            result.append(window)
+        return result
+    
+    def __len__(self):
+        return len(self.data_files)
+
+    def __getitem__(self, index):
+        # print(self.root_dir / self.data_files[index])
+        patch_window = self.data_files[index]
+        # print(patch_window.shape)
+        
+        data = torch.tensor(patch_window[:-1]).unsqueeze(1).float()
+        
+        # data[data == 0] = -1
+        # labels[labels == 50] = 0
+        print(data.shape, labels.shape)
+        
+        if self.normalize:
+            data = data - self.mean / self.std
+        return data, labels

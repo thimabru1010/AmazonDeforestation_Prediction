@@ -15,17 +15,15 @@ def confusion_matrix(true, pred, num_classes=2):
     return confusion_matrix, TP, FP, FN, TN
 
 def f1_score(pred, true, test_time=False):
-    _pred = (pred >= 0.5).reshape(-1)
-    _true = true.reshape(-1)
+    # _pred = (pred >= 0.5).reshape(-1)
+    # _true = true.reshape(-1)
     prec = Precision(pred, true)
     rec = Recall(pred, true)
     f1_clss0 = 2 * prec * rec / (prec + rec)
 
     _true = true.reshape(-1)
-    cm, TP, FP, FN, TN = confusion_matrix(_true, _pred)
-    if test_time:
-        print()
-        print(cm)
+    cm, TP, FP, FN, TN = confusion_matrix(true, pred)
+    
     prec = TN/(TN+FN)
     rec = TN/(TN+FP)
     f1_clss1 = 2 * prec * rec / (prec + rec)
@@ -36,13 +34,13 @@ def f1_score(pred, true, test_time=False):
     return f1_clss0, f1_clss1
 
 def Recall(pred, true):
-    pred = (pred >= 0.5).reshape(-1)
+    pred = pred.reshape(-1)
     true = true.reshape(-1)
     _, TP, _, FN, _ = confusion_matrix(true, pred)
     return TP/(TP+FN)
 
 def Precision(pred, true):
-    pred = (pred >= 0.5).reshape(-1)
+    pred = pred.reshape(-1)
     true = true.reshape(-1)
     _, TP, FP, _, _ = confusion_matrix(true, pred)
     return TP/(TP+FP)
