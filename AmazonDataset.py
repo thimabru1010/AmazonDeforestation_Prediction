@@ -109,15 +109,6 @@ class CustomDataset_Test(Dataset):
         
         self.transform = transform
 
-        if normalize:
-            # # get the mean/std values along the channel dimension
-            # mean = data.mean(axis=(0, 1, 2, 3)).reshape(1, 1, -1, 1, 1)
-            # std = data.std(axis=(0, 1, 2, 3)).reshape(1, 1, -1, 1, 1)
-            # data = (data - mean) / std
-            # self.mean = mean
-            # self.std = std
-            pass
-
     def __len__(self):
         return len(self.data_files)
 
@@ -211,14 +202,21 @@ class IbamaInpe25km_Dataset(Dataset):
             # print(self.data_files)
             func = lambda x: x.split('.tif')[0][4:]
             date_files = [func(file) for file in self.data_files]
-            df_date = pd.DataFrame(date_files, columns=['date_str'])
+            df_date = pd.DataFrame(date_files, columns=['date_str']) #0101
             df_date['date'] = pd.to_datetime(df_date['date_str'], format="%d%m%y")
             df_date = df_date.sort_values(by='date')
             print(df_date.head(10))
-            1/0
-            self.data_files = self.sliding_window(df_date.date, 3)
+            df_date_train = df_date[df_date['date'] < '2019-01-01']
+            df_date_val = df_date[(df_date['date'] >= '2019-01-01') & (df_date['date'] < '2020-01-01')]
+            df_date_test = df_date[df_date['date'] >= '2020-01-01']
             
-            self.data_files, self.val_files = train_test_split(self.data_files, test_size=0.2, random_state=42)
+            self.data_files = self.sliding_window(df_date_train.date, 3)
+            
+            self.val_files = self.sliding_window(df_date_val.date, 3)
+            
+            self.test_files = self.sliding_window(df_date_test.date, 3)
+            
+            # self.data_files, self.val_files = train_test_split(self.data_files, test_size=0.2, random_state=42)
             self.mean, self.std = self._get_mean_std()
             
             # print(len(self.data_files))
@@ -237,6 +235,9 @@ class IbamaInpe25km_Dataset(Dataset):
 
     def get_validation_set(self):
         return self.val_files
+    
+    def get_test_set(self):
+        return self.test_files
     
     def _get_mean_std(self):
         '''Get mean and std of the dataset'''
@@ -288,9 +289,9 @@ class IbamaInpe25km_Dataset(Dataset):
         # data_cp = np.zeros((2, 100, data.shape[2]))
         # data_cp[:, :data.shape[1], :] = data
         
-        data = torch.tensor(data).float()
+        # data = torch.tensor(data).float()
 
-        labels = torch.tensor(load_tif_image(self.root_dir / 'Geotiff-INPE/tiffs' / ('ArCS' + filenames[-1] + '.tif'))).float()
+        labels = load_tif_image(self.root_dir / 'Geotiff-INPE/tiffs' / ('ArCS' + filenames[-1] + '.tif'))
         labels[labels < -1e38] = 0
         
         # print(data.shape, labels.shape)
@@ -298,4 +299,14 @@ class IbamaInpe25km_Dataset(Dataset):
         
         if self.normalize:
             data = data - self.mean / self.std
-        return data.unsqueeze(1), labels.unsqueeze(0).unsqueeze(0)
+            
+        if self.transform:
+            # For albumentations the image needs to be in shape (H, W, C)
+            transformed = self.transform(image=data.reshape(data.shape[1], data.shape[2], data.shape[0]), mask=labels)
+            data = transformed['image']
+            labels = transformed['mask']
+        else:
+            data = torch.tensor(data)
+            labels = torch.tensor(labels)
+            
+        return data.unsqueeze(1).float(), labels.unsqueeze(0).unsqueeze(0).float()

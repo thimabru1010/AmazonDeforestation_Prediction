@@ -10,7 +10,7 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import pandas as pd
 import geopandas as gpd
-from BaseExperiment import BaseExperiment
+from BaseExperiment import BaseExperiment, test_model
 
 def load_tif_image(tif_path):
     gdal_header = gdal.Open(str(tif_path))
@@ -26,7 +26,7 @@ def apply_legal_amazon_mask(input_image: np.array, amazon_mask: np.array):
 root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA/25K')
 
 print(root_dir)
-batch_size = 32
+batch_size = 8
 num_workers = 8
 Debug = False
 
@@ -59,7 +59,7 @@ prob = 0.5
 copy_fn = lambda x, **kwargs: x.copy()
 transform = A.Compose(
     [
-        A.RandomRotate90(p=prob),
+        # A.RandomRotate90(p=prob),
         A.OneOf([A.HorizontalFlip(p=prob), A.VerticalFlip(p=prob)]),
         A.Lambda(image=copy_fn, mask=copy_fn),
         ToTensorV2()
@@ -91,11 +91,11 @@ custom_training_config = {
     # 'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score', 'CM'],
     'metrics': ['mse', 'mae'],
 
-    'ex_name': 'custom_exp02', # custom_exp
+    'ex_name': 'custom_exp03', # custom_exp
     'dataname': 'custom',
     'in_shape': [2, 1, 98, 136], # T, C, H, W = self.args.in_shape
     'patience': 10,
-    'delta': 0.0001,
+    'delta': 0.001,
 }
 
 custom_model_config = {
@@ -109,7 +109,7 @@ custom_model_config = {
     'model_type': 'gSTA',
     'N_S': 2,
     'N_T': 2,
-    'hid_S': 16, # default: 64
+    'hid_S': 32, # default: 64
     'hid_T': 128 # default: 256
 }
 
@@ -117,9 +117,10 @@ exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, cust
 
 exp.train()
 
-
+test_data = train_set.get_test_set()
+test_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data, mean=train_set.mean, std=train_set.std)
     
-# dataloader_test = torch.utils.data.DataLoader(
-#     test_set, batch_size=batch_size, shuffle=False, pin_memory=True)
+dataloader_test = torch.utils.data.DataLoader(
+    test_set, batch_size=batch_size, shuffle=False, pin_memory=True)
 
-# test_model(dataloader_test, custom_training_config, custom_model_config)
+test_model(dataloader_test, custom_training_config, custom_model_config)

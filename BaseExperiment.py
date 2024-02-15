@@ -8,6 +8,7 @@ import os
 from metrics import confusion_matrix, f1_score
 import numpy as np
 import torch.nn.functional as F
+from torchsummary import summary
 
 from sklearn.metrics import f1_score as skf1_score
 
@@ -29,10 +30,13 @@ class BaseExperiment():
         in_shape = custom_training_config['in_shape']
         self.model = self._build_model(in_shape, None, custom_model_config)
         
+        print(summary(self.model, tuple(in_shape)))
+        
         self.optm = optm.Adam(self.model.parameters(), lr=custom_training_config['lr'])
         
         # TODO: try to weight MSE loss
         self.loss = nn.MSELoss()
+        self.mae = nn.L1Loss()
         
         self.trainloader = trainloader
         self.valloader = valloader
@@ -64,10 +68,7 @@ class BaseExperiment():
 
     def validate_one_epoch(self):
         val_loss = 0
-        f1_clss0 = 0
-        f1_clss1 = 0
-        skf1 = 0
-        cm = np.zeros((2, 2), dtype=int)
+        val_mae = 0
         self.model.eval()
         # Disable gradient computation and reduce memory consumption.
         with torch.no_grad():
@@ -76,33 +77,15 @@ class BaseExperiment():
                 # Get only the first temporal channel
                 y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
                 loss = self.loss(y_pred, labels.to(self.device))
-                
-                #TODO: compute other classification metrics
-    
-                # _skf1 = skf1_score(_y_pred.reshape(-1), _labels.reshape(-1))
-                # _f1_clss0, _f1_clss1 = f1_score(_y_pred, _labels)
-                # _cm, _, _, _, _ = confusion_matrix(_labels, _y_pred)
+                mae = self.mae(y_pred, labels.to(self.device))
                 
                 val_loss += loss.detach()
-                # f1_clss0 += _f1_clss0.item()
-                # f1_clss1 += _f1_clss1.item()
-                # skf1 += _skf1.item()
-                # cm[0, 0] += _cm[0, 0]
-                # cm[0, 1] += _cm[0, 1]
-                # cm[1, 0] += _cm[1, 0]
-                # cm[1, 1] += _cm[1, 1]
+                val_mae += mae.detach()
             
         val_loss = val_loss / len(self.valloader)
-        # f1_clss0 = f1_clss0 / len(self.valloader)
-        # f1_clss1 = f1_clss1 / len(self.valloader)
-        # skf1 = skf1 / len(self.valloader)
+        val_mae = val_mae / len(self.valloader)
         
-        # print("====== Confusion Matrix ======")
-        # print(cm)
-        # print(skf1)
-        # print(f'F1 Score No def: {f1_clss0:.4f} - F1 Score Def: {f1_clss1:.4f}')
-        
-        return val_loss
+        return val_loss, val_mae
     
     def train(self):
         min_val_loss = float('inf')
@@ -111,9 +94,9 @@ class BaseExperiment():
             
             train_loss = self.train_one_epoch()
             
-            val_loss = self.validate_one_epoch()
+            val_loss, val_mae = self.validate_one_epoch()
             
-            if val_loss < min_val_loss + self.delta:
+            if val_loss + self.delta < min_val_loss:
                 min_val_loss = val_loss
                 early_stop_counter = 0
                 torch.save(self.model.state_dict(), os.path.join(self.work_dir_path, 'checkpoint.pth'))
@@ -125,12 +108,9 @@ class BaseExperiment():
                 print(f'Early Stopping! Early Stopping counter: {early_stop_counter}')
                 break
             
-            print(f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}")
-
-def _build_model(in_shape, nclasses, custom_model_config):
-    return SimVP_Model(in_shape=in_shape, nclasses=nclasses, **custom_model_config).to(self.device)
+            print(f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f} | Validation MAE = {val_mae:.6f}")
         
-def test_model(testloader, custom_training_config, custom_model_config):
+def old_test_model(testloader, custom_training_config, custom_model_config):
     work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
     device = "cuda:0"
     in_shape = custom_training_config['in_shape']
@@ -170,3 +150,60 @@ def test_model(testloader, custom_training_config, custom_model_config):
     print("====== Confusion Matrix ======")
     print(cm)
     print(f'F1 Score No def: {f1_clss0:.4f} - F1 Score Def: {f1_clss1:.4f}')
+    
+
+def _build_model(in_shape, nclasses, custom_model_config, device):
+    return SimVP_Model(in_shape=in_shape, nclasses=nclasses, **custom_model_config).to(device)
+
+def test_model(testloader, custom_training_config, custom_model_config):
+    work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
+    device = "cuda:0"
+    in_shape = custom_training_config['in_shape']
+        
+    model = _build_model(in_shape, None, custom_model_config, device)
+    model.load_state_dict(torch.load(os.path.join(work_dir_path, 'checkpoint.pth')))
+    # model.load_state_dict(os.path.join(work_dir_path, 'checkpoint.pth')).to(device)
+    model.eval()
+    
+    mse = nn.MSELoss()
+    mae = nn.L1Loss()
+    
+    test_loss = 0.0
+    test_mae = 0.0
+    # cm = np.zeros((2, 2), dtype=int)
+    # Disable gradient computation and reduce memory consumption.
+    with torch.no_grad():
+        for inputs, labels in tqdm(testloader):
+            y_pred = model(inputs.to(device))
+            # Get only the first temporal channel
+            y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
+            
+            loss = mse(y_pred, labels.to(device))
+            _mae = mae(y_pred, labels.to(device))
+                
+            test_loss += loss.detach()
+            test_mae += _mae.detach()
+            # print(_labels.shape)
+            # print(_y_pred.shape)
+    #         # 1/0
+    #         _f1_clss0, _f1_clss1 = f1_score(_y_pred, _labels)
+    #         _cm, _, _, _, _ = confusion_matrix(_labels, _y_pred)
+            
+    #         f1_clss0 += _f1_clss0.item()
+    #         f1_clss1 += _f1_clss1.item()
+    #         cm[0, 0] += _cm[0, 0]
+    #         cm[0, 1] += _cm[0, 1]
+    #         cm[1, 0] += _cm[1, 0]
+    #         cm[1, 1] += _cm[1, 1]
+        test_loss = test_loss / len(testloader)
+        test_mae = test_mae / len(testloader)
+        
+    # f1_clss0 = f1_clss0 / len(testloader)
+    # f1_clss1 = f1_clss1 / len(testloader)
+    
+    print("======== Metrics ========")
+    print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')
+    
+    # print("====== Confusion Matrix ======")
+    # print(cm)
+    # print(f'F1 Score No def: {f1_clss0:.4f} - F1 Score Def: {f1_clss1:.4f}')
