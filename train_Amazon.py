@@ -26,7 +26,7 @@ def apply_legal_amazon_mask(input_image: np.array, amazon_mask: np.array):
 root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA/25K')
 
 print(root_dir)
-batch_size = 16
+batch_size = 32
 num_workers = 8
 Debug = False
 
@@ -69,7 +69,8 @@ transform = A.Compose(
 # train_set = CustomDataset(root_dir=root_dir / 'Train', Debug=Debug, transform=transform)
 # val_set = CustomDataset(root_dir=root_dir / 'Val', Debug=Debug)
 train_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, transform=transform)
-val_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug)
+val_data = train_set.get_validation_set()
+val_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=val_data, mean=train_set.mean, std=train_set.std)
 
 print(len(train_set), len(val_set))
 
@@ -80,23 +81,21 @@ dataloader_val = torch.utils.data.DataLoader(
     
 # Exp17 training with categories 2 in input
 custom_training_config = {
-    'pre_seq_length': 4,
+    'pre_seq_length': 2,
     'aft_seq_length': 1,
-    'total_length': 5,
+    'total_length': 3,
     'batch_size': batch_size,
     'val_batch_size': batch_size,
     'epoch': 100,
-    'lr': 1e-5,
-    'final_div_factor': 	10000.0,
+    'lr': 1e-4,
     # 'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score', 'CM'],
     'metrics': ['mse', 'mae'],
 
     'ex_name': 'custom_exp02', # custom_exp
     'dataname': 'custom',
-    'in_shape': [4, 1, 64, 64], # T, C, H, W = self.args.in_shape
-    'loss_weights': loss_weights,
-    'weight_decay': 1e-4,
-    'patience': 10
+    'in_shape': [2, 1, 98, 136], # T, C, H, W = self.args.in_shape
+    'patience': 10,
+    'delta': 0.0001,
 }
 
 custom_model_config = {
@@ -108,10 +107,10 @@ custom_model_config = {
     
     # Here, we directly set these parameters
     'model_type': 'gSTA',
-    'N_S': 4,
-    'N_T': 4,
+    'N_S': 2,
+    'N_T': 2,
     'hid_S': 16, # default: 64
-    'hid_T': 256 # default: 256
+    'hid_T': 128 # default: 256
 }
 
 exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)

@@ -25,8 +25,8 @@ class SimVP_Model(nn.Module):
         H, W = int(H / 2**(N_S/2)), int(W / 2**(N_S/2))  # downsample 1 / 2**(N_S/2)
         act_inplace = False
         self.enc = Encoder(C, hid_S, N_S, spatio_kernel_enc, act_inplace=act_inplace)
-        print('DEBUG')
-        print(nclasses)
+        # print('DEBUG')
+        # print(nclasses)
         #! Alterado
         if nclasses:
             self.dec = Decoder(hid_S, nclasses, N_S, spatio_kernel_dec, act_inplace=act_inplace)
@@ -77,6 +77,7 @@ class Encoder(nn.Module):
 
     def __init__(self, C_in, C_hid, N_S, spatio_kernel, act_inplace=True):
         samplings = sampling_generator(N_S)
+        print(samplings)
         super(Encoder, self).__init__()
         self.enc = nn.Sequential(
               ConvSC(C_in, C_hid, spatio_kernel, downsampling=samplings[0],
@@ -260,7 +261,7 @@ class MidMetaNet(nn.Module):
     def forward(self, x):
         B, T, C, H, W = x.shape
         x = x.reshape(B, T*C, H, W)
-
+        
         z = x
         for i in range(self.N2):
             z = self.enc[i](z)
