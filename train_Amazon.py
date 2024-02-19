@@ -91,7 +91,7 @@ custom_training_config = {
     # 'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score', 'CM'],
     'metrics': ['mse', 'mae'],
 
-    'ex_name': 'custom_exp03', # custom_exp
+    'ex_name': 'custom_exp04', # custom_exp
     'dataname': 'custom',
     'in_shape': [2, 1, 98, 136], # T, C, H, W = self.args.in_shape
     'patience': 10,

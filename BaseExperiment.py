@@ -183,27 +183,33 @@ def test_model(testloader, custom_training_config, custom_model_config):
                 
             test_loss += loss.detach()
             test_mae += _mae.detach()
-            # print(_labels.shape)
-            # print(_y_pred.shape)
-    #         # 1/0
-    #         _f1_clss0, _f1_clss1 = f1_score(_y_pred, _labels)
-    #         _cm, _, _, _, _ = confusion_matrix(_labels, _y_pred)
-            
-    #         f1_clss0 += _f1_clss0.item()
-    #         f1_clss1 += _f1_clss1.item()
-    #         cm[0, 0] += _cm[0, 0]
-    #         cm[0, 1] += _cm[0, 1]
-    #         cm[1, 0] += _cm[1, 0]
-    #         cm[1, 1] += _cm[1, 1]
+
         test_loss = test_loss / len(testloader)
         test_mae = test_mae / len(testloader)
-        
-    # f1_clss0 = f1_clss0 / len(testloader)
-    # f1_clss1 = f1_clss1 / len(testloader)
     
     print("======== Metrics ========")
     print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')
     
-    # print("====== Confusion Matrix ======")
-    # print(cm)
-    # print(f'F1 Score No def: {f1_clss0:.4f} - F1 Score Def: {f1_clss1:.4f}')
+    #! Baseline test
+    # Check if the model outputed zero por all pixels
+    test_loss = 0.0
+    test_mae = 0.0
+    # cm = np.zeros((2, 2), dtype=int)
+    # Disable gradient computation and reduce memory consumption.
+    for inputs, labels in tqdm(testloader):
+        # y_pred = model(inputs.to(device))
+        y_pred = torch.zeros_like(labels)
+        # Get only the first temporal channel
+        # y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
+        
+        loss = mse(y_pred, labels)
+        _mae = mae(y_pred, labels)
+            
+        test_loss += loss.detach()
+        test_mae += _mae.detach()
+
+        test_loss = test_loss / len(testloader)
+        test_mae = test_mae / len(testloader)
+    
+    print("======== Zero Pred Baseline Metrics ========")
+    print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')
