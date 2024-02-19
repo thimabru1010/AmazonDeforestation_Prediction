@@ -187,15 +187,36 @@ class IbamaInpe25km_Dataset(Dataset):
         self.root_dir = root_dir
         if mode == 'train':
             # self.ibama_files = os.listdir(root_dir / 'Geotiff-IBAMA_resampled')
-            self.inpe_files = os.listdir(root_dir / 'Geotiff-INPE/tiffs')
+            inpe_folder_path = root_dir / 'INPE/tiff'
+            self.inpe_files = os.listdir(inpe_folder_path)
             # print(len(self.ibama_files), len(self.inpe_files))
             print(len(self.inpe_files))
             # Filter string to select files with 'ArCS' in the name
             self.arcs_files = list(filter(lambda x: 'ArCS' in x, self.inpe_files))
             self.arcs_files.remove('ArCS.tif')
-            self.dear_files = list(filter(lambda x: 'DeAr' in x, self.inpe_files))
-            self.dear_files.remove('DeAr.tif')
-            print(len(self.arcs_files), len(self.dear_files))
+            self.clouds_files = list(filter(lambda x: 'nv' in x, self.inpe_files))
+            self.clouds_files.remove('nv.tif')
+            self.for_files = list(filter(lambda x: 'flor' in x, self.inpe_files))
+            self.for_files.remove('flor.tif')
+            # Hidrografia
+            self.hidr_files = load_tif_image(inpe_folder_path / 'hidr.tif')
+            # Não Floresta (Ex: Banco de Areia)
+            self.no_for_files = load_tif_image(inpe_folder_path / 'nf.tif')
+            # Categorias Fundiarias
+            self.rodnofic = load_tif_image(inpe_folder_path / 'rodnofic.tif')
+            self.rodofic = load_tif_image(inpe_folder_path / 'rodofic.tif')
+            self.disturb = load_tif_image(inpe_folder_path / 'distUrb.tif')
+            self.distrios = load_tif_image(inpe_folder_path / 'distrios.tif')
+            self.distport = load_tif_image(inpe_folder_path / 'distport.tif')
+            self.efams_apa = load_tif_image(inpe_folder_path / 'EFAMS_APA.tif')
+            self.efams_ass = load_tif_image(inpe_folder_path / 'EFAMS_ASS.tif')
+            self.efams_car = load_tif_image(inpe_folder_path / 'EFAMS_CAR.tif')
+            self.efams_fpnd = load_tif_image(inpe_folder_path / 'EFAMS_FPND.tif')
+            self.efams_ti = load_tif_image(inpe_folder_path / 'EFAMS_TI.tif')
+            self.efams_uc = load_tif_image(inpe_folder_path / 'EFAMS_UC.tif')
+            1/0
+            
+            print(len(self.arcs_files))
             self.data_files = self.arcs_files
             # TODO create temporal windows sliding over the months
             self.data_files.sort()
@@ -246,7 +267,7 @@ class IbamaInpe25km_Dataset(Dataset):
         df.drop_duplicates(inplace=True)
         df['date_str'] = df['date'].dt.strftime('%d%m%y')
         for i, file in enumerate(df.date_str):
-            img = load_tif_image(self.root_dir / 'Geotiff-INPE/tiffs' / ('ArCS' + file + '.tif'))
+            img = load_tif_image(self.inpe_folder_path / ('ArCS' + file + '.tif'))
             if i == 0:
                 data = np.expand_dims(img, axis=0)
             else:
@@ -279,7 +300,7 @@ class IbamaInpe25km_Dataset(Dataset):
         filenames = df['date_str'].to_list()
         for i, file in enumerate(filenames[:-1]):
             # print(file)
-            img = load_tif_image(self.root_dir / 'Geotiff-INPE/tiffs' / ('ArCS' + file + '.tif'))
+            img = load_tif_image(self.inpe_folder_path / ('ArCS' + file + '.tif'))
             if i == 0:
                 data = np.expand_dims(img, axis=0)
             else:
@@ -291,7 +312,7 @@ class IbamaInpe25km_Dataset(Dataset):
         
         # data = torch.tensor(data).float()
 
-        labels = load_tif_image(self.root_dir / 'Geotiff-INPE/tiffs' / ('ArCS' + filenames[-1] + '.tif'))
+        labels = load_tif_image(self.inpe_folder_path / ('ArCS' + filenames[-1] + '.tif'))
         labels[labels < -1e38] = 0
         
         # print(data.shape, labels.shape)

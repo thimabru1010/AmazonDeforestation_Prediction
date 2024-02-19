@@ -23,7 +23,7 @@ def apply_legal_amazon_mask(input_image: np.array, amazon_mask: np.array):
     return input_image
 
 # root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/Dataset/DETR_Patches')
-root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA/25K')
+root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE/25K')
 
 print(root_dir)
 batch_size = 8

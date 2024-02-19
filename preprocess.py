@@ -62,7 +62,10 @@ def preprocess_patches(img_train: np.ndarray, patch_size: int, overlap_stride: i
     # print(f'Patches filtered: {patches_filt.shape}')
     # return patches_filt
     return patches
-    
+
+def prep_INPE25km(img_train: np.ndarray, img_test: np.ndarray, mask: np.ndarray, args: argparse.Namespace):
+    pass
+
 def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, window_size: int=5):
     folder_path = save_path / modality
     folder_path_input = folder_path / 'Input'
