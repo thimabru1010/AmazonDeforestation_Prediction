@@ -112,6 +112,7 @@ class Decoder(nn.Module):
     def forward(self, hid, enc1=None):
         for i in range(0, len(self.dec)-1):
             hid = self.dec[i](hid)
+        # print(hid.shape, enc1.shape)
         Y = self.dec[-1](hid + enc1)
         Y = self.readout(Y)
         # print('DEBUG forward')

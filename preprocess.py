@@ -8,6 +8,8 @@ import pathlib
 from tqdm import tqdm
 from time import time
 
+gdal.PushErrorHandler('CPLQuietErrorHandler')
+
 def plot_images(image1, image2, area):
     # Create a figure and axes with two subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))  # 1 row, 2 columns

@@ -11,6 +11,10 @@ from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from sklearn.model_selection import train_test_split
+from datetime import datetime
+
+from osgeo import gdal
+gdal.PushErrorHandler('CPLQuietErrorHandler')
 
 class CustomDataset(Dataset):
     def __init__(self, root_dir: Path, normalize: bool=False, transform: torchvision.transforms=None,
@@ -182,12 +186,15 @@ class CustomDataset_Test(Dataset):
 
 class IbamaInpe25km_Dataset(Dataset):
     def __init__(self, root_dir: Path, normalize: bool=True, transform: torchvision.transforms=None,
-                Debug: bool=False, mode: str='train', val_data=None, mean=None, std=None):
+                Debug: bool=False, mode: str='train', val_data=None, means=None, stds=None):
         super(IbamaInpe25km_Dataset, self).__init__()
         self.root_dir = root_dir
+        inpe_folder_path = root_dir / 'INPE/tiff'
+        self.inpe_folder_path = inpe_folder_path
         if mode == 'train':
             # self.ibama_files = os.listdir(root_dir / 'Geotiff-IBAMA_resampled')
-            inpe_folder_path = root_dir / 'INPE/tiff'
+            # inpe_folder_path = root_dir / 'INPE/tiff'
+            # self.inpe_folder_path = inpe_folder_path
             self.inpe_files = os.listdir(inpe_folder_path)
             # print(len(self.ibama_files), len(self.inpe_files))
             print(len(self.inpe_files))
@@ -198,76 +205,133 @@ class IbamaInpe25km_Dataset(Dataset):
             self.clouds_files.remove('nv.tif')
             self.for_files = list(filter(lambda x: 'flor' in x, self.inpe_files))
             self.for_files.remove('flor.tif')
-            # Hidrografia
-            self.hidr_files = load_tif_image(inpe_folder_path / 'hidr.tif')
-            # Não Floresta (Ex: Banco de Areia)
-            self.no_for_files = load_tif_image(inpe_folder_path / 'nf.tif')
-            # Categorias Fundiarias
-            self.rodnofic = load_tif_image(inpe_folder_path / 'rodnofic.tif')
-            self.rodofic = load_tif_image(inpe_folder_path / 'rodofic.tif')
-            self.disturb = load_tif_image(inpe_folder_path / 'distUrb.tif')
-            self.distrios = load_tif_image(inpe_folder_path / 'distrios.tif')
-            self.distport = load_tif_image(inpe_folder_path / 'distport.tif')
-            self.efams_apa = load_tif_image(inpe_folder_path / 'EFAMS_APA.tif')
-            self.efams_ass = load_tif_image(inpe_folder_path / 'EFAMS_ASS.tif')
-            self.efams_car = load_tif_image(inpe_folder_path / 'EFAMS_CAR.tif')
-            self.efams_fpnd = load_tif_image(inpe_folder_path / 'EFAMS_FPND.tif')
-            self.efams_ti = load_tif_image(inpe_folder_path / 'EFAMS_TI.tif')
-            self.efams_uc = load_tif_image(inpe_folder_path / 'EFAMS_UC.tif')
-            1/0
             
             print(len(self.arcs_files))
             self.data_files = self.arcs_files
-            # TODO create temporal windows sliding over the months
-            self.data_files.sort()
-            # print(self.data_files)
-            func = lambda x: x.split('.tif')[0][4:]
-            date_files = [func(file) for file in self.data_files]
-            df_date = pd.DataFrame(date_files, columns=['date_str']) #0101
-            df_date['date'] = pd.to_datetime(df_date['date_str'], format="%d%m%y")
-            df_date = df_date.sort_values(by='date')
+            df_date = self.date2datetime(self.data_files)
+            df_date_for = self.date2datetime(self.for_files)
+            df_date_clouds = self.date2datetime(self.clouds_files, prefix=2, data_type='clouds')
+            print(df_date_clouds.head(10))
+            print(df_date_for.head(10))
             print(df_date.head(10))
-            df_date_train = df_date[df_date['date'] < '2019-01-01']
-            df_date_val = df_date[(df_date['date'] >= '2019-01-01') & (df_date['date'] < '2020-01-01')]
-            df_date_test = df_date[df_date['date'] >= '2020-01-01']
+            # df_date_train = df_date[df_date['date'] < '2019-01-01']
+            # df_date_val = df_date[(df_date['date'] >= '2019-01-01') & (df_date['date'] < '2020-01-01')]
+            # df_date_test = df_date[df_date['date'] >= '2020-01-01']
+            df_date_train, df_date_val, df_date_test = self.split_train_val_test(df_date)
+            df_date_train_for, _, _ = self.split_train_val_test(df_date_for)
+            df_date_train_clouds, _, _ = self.split_train_val_test(df_date_clouds)
             
             self.data_files = self.sliding_window(df_date_train.date, 3)
-            
             self.val_files = self.sliding_window(df_date_val.date, 3)
-            
             self.test_files = self.sliding_window(df_date_test.date, 3)
             
             # self.data_files, self.val_files = train_test_split(self.data_files, test_size=0.2, random_state=42)
-            self.mean, self.std = self._get_mean_std()
+            self.mean, self.std = self._get_mean_std(self.data_files)
+            self.mean_for, self.std_for = self._get_mean_std(df_date_train_for, 'flor')
+            self.mean_clouds, self.std_clouds = self._get_mean_std(df_date_train_clouds, 'nv')
+            
             
             # print(len(self.data_files))
             # 1/0
         else:
             self.data_files = val_data
-            self.mean = mean
-            self.std = std
+            self.mean = means[0]
+            self.std = stds[0]
+            self.mean_for = means[1]
+            self.std_for = stds[1]
+            self.mean_clouds = means[2]
+            self.std_clouds = stds[2]
             self.val_files = self.data_files
         
         if Debug:
             self.data_files = self.data_files[:20]
             
+        # Hidrografia
+        self.hidr_files = load_tif_image(inpe_folder_path / 'hidr.tif')
+        self.hidr_files = self.normalize_non_temporal(self.hidr_files)
+        # Não Floresta (Ex: Banco de Areia)
+        self.no_for_files = load_tif_image(inpe_folder_path / 'nf.tif')
+        self.no_for_files = self.normalize_non_temporal(self.no_for_files)
+        # Categorias Fundiarias
+        self.rodnofic = load_tif_image(inpe_folder_path / 'rodnofic.tif')
+        self.rodofic = load_tif_image(inpe_folder_path / 'rodofic.tif')
+        self.disturb = load_tif_image(inpe_folder_path / 'distUrb.tif')
+        self.distrios = load_tif_image(inpe_folder_path / 'distrios.tif')
+        self.distport = load_tif_image(inpe_folder_path / 'distport.tif')
+        self.efams_apa = load_tif_image(inpe_folder_path / 'EFAMS_APA.tif')
+        self.efams_ass = load_tif_image(inpe_folder_path / 'EFAMS_ASS.tif')
+        self.efams_car = load_tif_image(inpe_folder_path / 'EFAMS_CAR.tif')
+        self.efams_fpnd = load_tif_image(inpe_folder_path / 'EFAMS_FPND.tif')
+        self.efams_ti = load_tif_image(inpe_folder_path / 'EFAMS_TI.tif')
+        self.efams_uc = load_tif_image(inpe_folder_path / 'EFAMS_UC.tif')
+        
+        self.rodnofic = self.normalize_non_temporal(self.rodnofic)
+        self.rodofic = self.normalize_non_temporal(self.rodofic)
+        self.disturb = self.normalize_non_temporal(self.disturb)
+        self.distrios = self.normalize_non_temporal(self.distrios)
+        self.distport = self.normalize_non_temporal(self.distport)
+        self.efams_apa = self.normalize_non_temporal(self.efams_apa)
+        self.efams_ass = self.normalize_non_temporal(self.efams_ass)
+        self.efams_car = self.normalize_non_temporal(self.efams_car)
+        self.efams_fpnd = self.normalize_non_temporal(self.efams_fpnd)
+        self.efams_ti = self.normalize_non_temporal(self.efams_ti)
+        self.efams_uc = self.normalize_non_temporal(self.efams_uc)
+            
         self.normalize = normalize
         self.transform = transform
-
+    
+    def split_train_val_test(self, df_date):
+        df_date_train = df_date[df_date['date'] < '2019-01-01']
+        df_date_val = df_date[(df_date['date'] >= '2019-01-01') & (df_date['date'] < '2020-01-01')]
+        df_date_test = df_date[df_date['date'] >= '2020-01-01']
+        return df_date_train, df_date_val, df_date_test
+    
+    def date2datetime(self, data_files, prefix=4, data_type='ArCS'):
+        data_files.sort()
+        func = lambda x: x.split('.tif')[0][prefix:]
+        date_files = [func(file) for file in data_files]
+        df_date = pd.DataFrame(date_files, columns=['date_str']) #0101
+        if data_type == 'clouds':
+            df_date['date'] = pd.to_datetime(df_date['date_str'], format="%Y%m%d")
+            # df_date['date'] = df_date['date'].dt.strftime("%d%m%y")
+        else:
+            df_date['date'] = pd.to_datetime(df_date['date_str'], format="%d%m%y")
+        df_date = df_date.sort_values(by='date')
+        return df_date
+    
+    def normalize_non_temporal(self, data):
+        '''Normalize the non-temporal channels'''
+        data[data < -1e38] = -1
+        _data = data[data != -1]
+        mean = _data.mean(axis=0)
+        std = _data.std(axis=0)
+        print('Mean:', mean, 'Std:', std)
+        return (data - mean) / std
+    
     def get_validation_set(self):
         return self.val_files
     
     def get_test_set(self):
         return self.test_files
     
-    def _get_mean_std(self):
+    def _get_mean_std(self, data_files, data_type='ArCS'):
         '''Get mean and std of the dataset'''
         # print(self.data_files)
-        df = pd.concat(self.data_files).to_frame(name='date')
+        # print(type(data_files))
+        if type(data_files) == list:
+            df = pd.concat(data_files).to_frame(name='date')
+        else:
+            df = data_files.copy()
         df.drop_duplicates(inplace=True)
-        df['date_str'] = df['date'].dt.strftime('%d%m%y')
+        if data_type == 'nv':
+            df['date_str'] = df['date'].dt.strftime('%Y%m%d')
+        else:
+            df['date_str'] = df['date'].dt.strftime('%d%m%y')
+            
         for i, file in enumerate(df.date_str):
-            img = load_tif_image(self.inpe_folder_path / ('ArCS' + file + '.tif'))
+            # img = load_tif_image(self.inpe_folder_path / ('ArCS' + file + '.tif'))
+            # print(data_type + file + '.tif')
+            img = load_tif_image(self.inpe_folder_path / (data_type + file + '.tif'))
             if i == 0:
                 data = np.expand_dims(img, axis=0)
             else:
@@ -301,33 +365,221 @@ class IbamaInpe25km_Dataset(Dataset):
         for i, file in enumerate(filenames[:-1]):
             # print(file)
             img = load_tif_image(self.inpe_folder_path / ('ArCS' + file + '.tif'))
+            img_flor = load_tif_image(self.inpe_folder_path / ('flor' + file + '.tif'))
+            cloud_date = datetime.strptime(file, '%d%m%y').strftime('%Y%m%d')
+            try:
+                img_clouds = load_tif_image(self.inpe_folder_path / ('nv' + cloud_date + '.tif'))
+            except:
+                cloud_date = cloud_date.replace('16', '15')
+                img_clouds = load_tif_image(self.inpe_folder_path / ('nv' + cloud_date + '.tif'))
+ 
             if i == 0:
                 data = np.expand_dims(img, axis=0)
+                data_flor = np.expand_dims(img_flor, axis=0)
+                data_clouds = np.expand_dims(img_clouds, axis=0)
             else:
                 data = np.concatenate((data, np.expand_dims(img, axis=0)), axis=0)
+                data_flor = np.concatenate((data_flor, np.expand_dims(img_flor, axis=0)), axis=0)
+                data_clouds = np.concatenate((data_clouds, np.expand_dims(img_clouds, axis=0)), axis=0)
         
         data[data < -1e38] = 0
-        # data_cp = np.zeros((2, 100, data.shape[2]))
-        # data_cp[:, :data.shape[1], :] = data
-        
-        # data = torch.tensor(data).float()
+        data_flor[data_flor < -1e38] = 0
+        data_clouds[data_clouds < -1e38] = 0
 
         labels = load_tif_image(self.inpe_folder_path / ('ArCS' + filenames[-1] + '.tif'))
         labels[labels < -1e38] = 0
+        labels[labels == -1] = 0
         
         # print(data.shape, labels.shape)
         # print(self.mean.shape, self.std.shape)
         
         if self.normalize:
             data = data - self.mean / self.std
+            data_flor = data_flor - self.mean_for / self.std_for
+            data_clouds = data_clouds - self.mean_clouds / self.std_clouds
+            
+        data = np.stack((data, data_flor, data_clouds), axis=1)
+        catg_fundi = np.stack((self.rodnofic, self.rodofic, self.disturb, self.distrios, self.distport,\
+            self.efams_apa, self.efams_ass, self.efams_car, self.efams_fpnd, self.efams_ti, self.efams_uc), axis=0)
+        catg_fundi = np.stack((catg_fundi, catg_fundi), axis=0)
+        data = np.concatenate((data, catg_fundi), axis=1)
+        # data = np.expand_dims(data, axis=1)
             
         if self.transform:
             # For albumentations the image needs to be in shape (H, W, C)
-            transformed = self.transform(image=data.reshape(data.shape[1], data.shape[2], data.shape[0]), mask=labels)
-            data = transformed['image']
+            transformed = self.transform(image=data.reshape(data.shape[2], data.shape[3], -1), mask=labels)
+            data = transformed['image'].reshape(data.shape[0], data.shape[1], data.shape[2], data.shape[3])
             labels = transformed['mask']
         else:
             data = torch.tensor(data)
             labels = torch.tensor(labels)
             
-        return data.unsqueeze(1).float(), labels.unsqueeze(0).unsqueeze(0).float()
+        # print('DEBUG')
+        # print(labels[labels < 0])
+        # 1/0
+            
+        return data.float(), labels.unsqueeze(0).unsqueeze(0).float()
+    
+# ----------------------------------------------------------------------------------------------
+
+class IbamaDETER1km_Dataset(Dataset):
+    def __init__(self, root_dir: Path, normalize: bool=True, transform: torchvision.transforms=None,
+                Debug: bool=False, mode: str='train', val_data=None, means=None, stds=None):
+        super(IbamaDETER1km_Dataset, self).__init__()
+        self.root_dir = root_dir
+        inpe_folder_path = root_dir / 'INPE/tiff'
+        self.inpe_folder_path = inpe_folder_path
+        if mode == 'train':
+            
+            
+            # print(len(self.data_files))
+            # 1/0
+        else:
+            self.data_files = val_data
+            self.mean = means[0]
+            self.std = stds[0]
+        
+        if Debug:
+            self.data_files = self.data_files[:20]
+        
+        #! IBAMA
+        # Hidrografia
+        self.hidr_files = load_tif_image(inpe_folder_path / 'hidr.tif')
+        self.hidr_files = self.normalize_non_temporal(self.hidr_files)
+        # Não Floresta (Ex: Banco de Areia)
+        self.no_for_files = load_tif_image(inpe_folder_path / 'nf.tif')
+        self.no_for_files = self.normalize_non_temporal(self.no_for_files)
+        # Categorias Fundiarias
+        self.rodnofic = load_tif_image(inpe_folder_path / 'rodnofic.tif')
+        self.rodofic = load_tif_image(inpe_folder_path / 'rodofic.tif')
+        self.disturb = load_tif_image(inpe_folder_path / 'distUrb.tif')
+        self.distrios = load_tif_image(inpe_folder_path / 'distrios.tif')
+        self.distport = load_tif_image(inpe_folder_path / 'distport.tif')
+        self.efams_apa = load_tif_image(inpe_folder_path / 'EFAMS_APA.tif')
+        self.efams_ass = load_tif_image(inpe_folder_path / 'EFAMS_ASS.tif')
+        self.efams_car = load_tif_image(inpe_folder_path / 'EFAMS_CAR.tif')
+        self.efams_fpnd = load_tif_image(inpe_folder_path / 'EFAMS_FPND.tif')
+        self.efams_ti = load_tif_image(inpe_folder_path / 'EFAMS_TI.tif')
+        self.efams_uc = load_tif_image(inpe_folder_path / 'EFAMS_UC.tif')
+        
+        self.rodnofic = self.normalize_non_temporal(self.rodnofic)
+        self.rodofic = self.normalize_non_temporal(self.rodofic)
+        self.disturb = self.normalize_non_temporal(self.disturb)
+        self.distrios = self.normalize_non_temporal(self.distrios)
+        self.distport = self.normalize_non_temporal(self.distport)
+        self.efams_apa = self.normalize_non_temporal(self.efams_apa)
+        self.efams_ass = self.normalize_non_temporal(self.efams_ass)
+        self.efams_car = self.normalize_non_temporal(self.efams_car)
+        self.efams_fpnd = self.normalize_non_temporal(self.efams_fpnd)
+        self.efams_ti = self.normalize_non_temporal(self.efams_ti)
+        self.efams_uc = self.normalize_non_temporal(self.efams_uc)
+            
+        self.normalize = normalize
+        self.transform = transform
+    
+    def normalize_non_temporal(self, data):
+        '''Normalize the non-temporal channels'''
+        data[data < -1e38] = -1
+        _data = data[data != -1]
+        mean = _data.mean(axis=0)
+        std = _data.std(axis=0)
+        print('Mean:', mean, 'Std:', std)
+        return (data - mean) / std
+    
+    def get_validation_set(self):
+        return self.val_files
+    
+    def get_test_set(self):
+        return self.test_files
+    
+    def _get_mean_std(self, data_files, data_type='ArCS'):
+        '''Get mean and std of the dataset'''
+        # print(self.data_files)
+        # print(type(data_files))
+        if type(data_files) == list:
+            df = pd.concat(data_files).to_frame(name='date')
+        else:
+            df = data_files.copy()
+        df.drop_duplicates(inplace=True)
+        if data_type == 'nv':
+            df['date_str'] = df['date'].dt.strftime('%Y%m%d')
+        else:
+            df['date_str'] = df['date'].dt.strftime('%d%m%y')
+            
+        for i, file in enumerate(df.date_str):
+            # img = load_tif_image(self.inpe_folder_path / ('ArCS' + file + '.tif'))
+            # print(data_type + file + '.tif')
+            img = load_tif_image(self.inpe_folder_path / (data_type + file + '.tif'))
+            if i == 0:
+                data = np.expand_dims(img, axis=0)
+            else:
+                data = np.concatenate((data, np.expand_dims(img, axis=0)), axis=0)
+        # Calculates the mean and std only for amazon pixels (Excluding the background)
+        data[data < -1e38] = -1
+        data = data[data != -1]
+        mean = data.mean(axis=0)
+        std = data.std(axis=0)
+        print('Mean:', mean, 'Std:', std)
+        return mean, std
+    
+    def sliding_window(self, input_list, window_size):
+        result = []
+        for i in range(len(input_list) - window_size + 1):
+            window = input_list[i:i + window_size]
+            result.append(window)
+        return result
+    
+    def __len__(self):
+        return len(self.data_files)
+
+    def __getitem__(self, index):
+        # print(self.root_dir / self.data_files[index])
+        patch_window = self.data_files[index]
+        # print(patch_window)
+        df = patch_window.to_frame(name='date')
+        df['date_str'] = df['date'].dt.strftime('%d%m%y')
+        # print(patch_window.shape)
+        filenames = df['date_str'].to_list()
+        for i, file in enumerate(filenames[:-1]):
+            # print(file)
+            img = load_tif_image(self.inpe_folder_path / ('ArCS' + file + '.tif'))
+ 
+            if i == 0:
+                data = np.expand_dims(img, axis=0)
+            else:
+                data = np.concatenate((data, np.expand_dims(img, axis=0)), axis=0)
+        
+        data[data < -1e38] = 0
+
+        labels = load_tif_image(self.inpe_folder_path / ('ArCS' + filenames[-1] + '.tif'))
+        labels[labels < -1e38] = 0
+        labels[labels == -1] = 0
+        
+        # print(data.shape, labels.shape)
+        # print(self.mean.shape, self.std.shape)
+        
+        if self.normalize:
+            data = data - self.mean / self.std
+            data_flor = data_flor - self.mean_for / self.std_for
+            data_clouds = data_clouds - self.mean_clouds / self.std_clouds
+            
+        catg_fundi = np.stack((self.rodnofic, self.rodofic, self.disturb, self.distrios, self.distport,\
+            self.efams_apa, self.efams_ass, self.efams_car, self.efams_fpnd, self.efams_ti, self.efams_uc), axis=0)
+        catg_fundi = np.stack((catg_fundi, catg_fundi), axis=0)
+        data = np.concatenate((data, catg_fundi), axis=1)
+        # data = np.expand_dims(data, axis=1)
+            
+        if self.transform:
+            # For albumentations the image needs to be in shape (H, W, C)
+            transformed = self.transform(image=data.reshape(data.shape[2], data.shape[3], -1), mask=labels)
+            data = transformed['image'].reshape(data.shape[0], data.shape[1], data.shape[2], data.shape[3])
+            labels = transformed['mask']
+        else:
+            data = torch.tensor(data)
+            labels = torch.tensor(labels)
+            
+        # print('DEBUG')
+        # print(labels[labels < 0])
+        # 1/0
+            
+        return data.float(), labels.unsqueeze(0).unsqueeze(0).float()

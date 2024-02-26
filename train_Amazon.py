@@ -70,7 +70,7 @@ transform = A.Compose(
 # val_set = CustomDataset(root_dir=root_dir / 'Val', Debug=Debug)
 train_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, transform=transform)
 val_data = train_set.get_validation_set()
-val_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=val_data, mean=train_set.mean, std=train_set.std)
+val_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=val_data, means=[train_set.mean, train_set.mean_for, train_set.mean_clouds], stds=[train_set.std, train_set.std_for, train_set.std_clouds])
 
 print(len(train_set), len(val_set))
 
@@ -91,11 +91,12 @@ custom_training_config = {
     # 'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score', 'CM'],
     'metrics': ['mse', 'mae'],
 
-    'ex_name': 'custom_exp04', # custom_exp
+    'ex_name': 'custom_exp09', # custom_exp
     'dataname': 'custom',
-    'in_shape': [2, 1, 98, 136], # T, C, H, W = self.args.in_shape
+    'in_shape': [2, 14, 98, 136], # T, C, H, W = self.args.in_shape
     'patience': 10,
     'delta': 0.001,
+    'amazon_mask': True
 }
 
 custom_model_config = {
@@ -118,7 +119,7 @@ exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, cust
 exp.train()
 
 test_data = train_set.get_test_set()
-test_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data, mean=train_set.mean, std=train_set.std)
+test_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data, means=[train_set.mean, train_set.mean_for, train_set.mean_clouds], stds=[train_set.std, train_set.std_for, train_set.std_clouds])
     
 dataloader_test = torch.utils.data.DataLoader(
     test_set, batch_size=batch_size, shuffle=False, pin_memory=True)

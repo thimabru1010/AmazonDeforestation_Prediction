@@ -9,14 +9,13 @@ from metrics import confusion_matrix, f1_score
 import numpy as np
 import torch.nn.functional as F
 from torchsummary import summary
+from preprocess import load_tif_image
 
 from sklearn.metrics import f1_score as skf1_score
-
-def weighted_mse_loss(y_pred, y_true, weights):
-    return torch.mean(weights * (y_pred - y_true) ** 2)
+from weighted_mse_loss import WMSELoss
 
 class BaseExperiment():
-    def __init__(self, trainloader, valloader, custom_model_config, custom_training_config):
+    def __init__(self, trainloader, valloader, custom_model_config, custom_training_config, seed=42):
         # TODO: wrap into a function to create work dir
         # Create work dir
         self.work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
@@ -28,14 +27,20 @@ class BaseExperiment():
         self.delta = custom_training_config['delta']
         self.device = "cuda:0"
         in_shape = custom_training_config['in_shape']
+        torch.manual_seed(seed)
         self.model = self._build_model(in_shape, None, custom_model_config)
         
         print(summary(self.model, tuple(in_shape)))
         
         self.optm = optm.Adam(self.model.parameters(), lr=custom_training_config['lr'])
         
-        # TODO: try to weight MSE loss
-        self.loss = nn.MSELoss()
+        if custom_training_config['amazon_mask']:
+            mask = load_tif_image('data/IBAMA_INPE/25K/INPE/tiff/mask.tif')
+            self.loss = WMSELoss(weight=0.8, mask=mask)
+        else:
+            self.loss = nn.MSELoss()
+            mask = None
+            
         self.mae = nn.L1Loss()
         
         self.trainloader = trainloader
