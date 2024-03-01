@@ -53,11 +53,11 @@ class BaseExperiment():
                 # mask = mask[:img_full_shape[1], :img_full_shape[2]]
             # mask = None
             self.loss = WMSELoss(weight=1)
+            self.mae = WMAELoss(weight=1)
         else:
             self.loss = nn.MSELoss()
+            self.mae = nn.L1Loss()
             # mask = None
-            
-        self.mae = nn.L1Loss()
         
         self.trainloader = trainloader
         self.valloader = valloader
