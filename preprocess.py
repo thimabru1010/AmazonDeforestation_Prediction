@@ -45,25 +45,50 @@ def load_tif_image(tif_path):
     return gdal_header.ReadAsArray()
 
 def extract_patches(image: np.ndarray, patch_size: int, stride: int) -> np.ndarray:
-    window_shape_array = (image.shape[0], patch_size, patch_size)
-    print(image.shape)
-    return np.array(view_as_windows(image, window_shape_array, step=stride)).reshape((-1,) + window_shape_array)
+    if len(image.shape) == 3:
+        window_shape_array = (image.shape[0], patch_size, patch_size)
+        print(image.shape)
+        return np.array(view_as_windows(image, window_shape_array, step=stride)).reshape((-1,) + window_shape_array)
+    elif len(image.shape) == 2:
+        window_shape_array = (patch_size, patch_size)
+        print(image.shape)
+        return np.array(view_as_windows(image, window_shape_array, step=stride)).reshape((-1,) + window_shape_array)
 
-def preprocess_patches(img_train: np.ndarray, patch_size: int, overlap_stride: int):
+def preprocess_patches(img: np.ndarray, patch_size: int, overlap: int):
     print('Extracting patches...')
-    patches = extract_patches(img_train, patch_size=patch_size, stride=overlap_stride)
+    stride = int((1-overlap)*patch_size)
+    patches = extract_patches(img, patch_size=patch_size, stride=stride)
     print(f'Patches extracted: {patches.shape}')
-
-    # Filter deforestation
-    #! Here we are eliminating the patches along all temporal axis 
-    #! if their sum along the months isn't above the threshold
-    # print('Filtering no deforestation patches...')
-    # print(patches.shape)
-    # keep_patches = np.mean((patches == 1), axis=(1, 2, 3)) > args.min_def
-    # patches_filt = patches[keep_patches]
-    # print(f'Patches filtered: {patches_filt.shape}')
-    # return patches_filt
     return patches
+
+def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=3, mask_patches: np.ndarray=None) -> np.ndarray:
+    skipped_count = 0
+    # if mask_patches is not None:
+    windowed_mask_patches = []
+    windowed_patches = []
+    total_iterations = patches.shape[0] * (patches.shape[1] - window_size + 1)
+    with tqdm(total=total_iterations, desc='Dividing in prediction windows') as pbar:
+        # Loop trough patches
+        for i, patch in enumerate(patches):
+            # print(patch.shape)
+            # Loop through time
+            for j in range(patch.shape[0] - window_size + 1):
+                windowed_patch = patch[j:j+window_size]
+                label = windowed_patch[-1]
+                if np.mean(label > 0, axis=(0, 1)) < min_def:
+                    skipped_count += 1
+                    pbar.update(1)
+                    continue
+                windowed_patches.append(windowed_patch)
+                if mask_patches is not None:
+                    windowed_mask_patches.append(mask_patches[i])
+                pbar.update(1)
+    print(f'{skipped_count} Skipped Images')
+    if mask_patches is not None:
+        windowed_mask_patches = np.concatenate(windowed_mask_patches, axis=0).reshape((-1,) + mask_patches.shape[1:])
+    else:
+        windowed_mask_patches = None
+    return np.concatenate(windowed_patches, axis=0).reshape((-1, window_size) + patches.shape[2:]), windowed_mask_patches
 
 def prep_INPE25km(img_train: np.ndarray, img_test: np.ndarray, mask: np.ndarray, args: argparse.Namespace):
     pass

@@ -5,14 +5,15 @@ from segmentation_models_pytorch.losses import FocalLoss
 import torch.nn as nn
 import torch.optim as optm
 import os
+import json
 from metrics import confusion_matrix, f1_score
 import numpy as np
 import torch.nn.functional as F
 from torchsummary import summary
-from preprocess import load_tif_image
+from preprocess import load_tif_image, preprocess_patches, divide_pred_windows
 
 from sklearn.metrics import f1_score as skf1_score
-from weighted_mse_loss import WMSELoss
+from CustomLosses import WMSELoss, WMAELoss
 
 class BaseExperiment():
     def __init__(self, trainloader, valloader, custom_model_config, custom_training_config, seed=42):
@@ -22,12 +23,18 @@ class BaseExperiment():
         if not os.path.exists(self.work_dir_path):
             os.makedirs(self.work_dir_path)
             
+        self._save_json(custom_model_config, 'model_config.json')
+        self._save_json(custom_training_config, 'model_training.json')
+            
         self.epochs = custom_training_config['epoch']
         self.patience = custom_training_config['patience']
         self.delta = custom_training_config['delta']
         self.device = "cuda:0"
         in_shape = custom_training_config['in_shape']
+        # img_full_shape = custom_training_config['img_shape']
         torch.manual_seed(seed)
+        
+        print('Input shape:', in_shape)
         self.model = self._build_model(in_shape, None, custom_model_config)
         
         print(summary(self.model, tuple(in_shape)))
@@ -35,11 +42,20 @@ class BaseExperiment():
         self.optm = optm.Adam(self.model.parameters(), lr=custom_training_config['lr'])
         
         if custom_training_config['amazon_mask']:
-            mask = load_tif_image('data/IBAMA_INPE/25K/INPE/tiff/mask.tif')
-            self.loss = WMSELoss(weight=0.8, mask=mask)
+            if custom_training_config['pixel_size'] == '25K':
+                mask = load_tif_image('data/IBAMA_INPE/25K/INPE/tiff/mask.tif')
+            elif custom_training_config['pixel_size'] == '1K':
+                pass
+                # mask = mask_patches
+                # mask = load_tif_image('data/IBAMA_INPE/1K/tiff_filled/mask.tif')
+                # xcut = (mask.shape[0] // custom_training_config['patch_size']) * custom_training_config['patch_size']
+                # ycut = (mask.shape[1] // custom_training_config['patch_size']) * custom_training_config['patch_size']
+                # mask = mask[:img_full_shape[1], :img_full_shape[2]]
+            # mask = None
+            self.loss = WMSELoss(weight=1)
         else:
             self.loss = nn.MSELoss()
-            mask = None
+            # mask = None
             
         self.mae = nn.L1Loss()
         
@@ -49,6 +65,10 @@ class BaseExperiment():
     def _build_model(self, in_shape, nclasses, custom_model_config):
         return SimVP_Model(in_shape=in_shape, nclasses=nclasses, **custom_model_config).to(self.device)
     
+    def _save_json(self, data, filename):
+        with open(os.path.join(self.work_dir_path, filename), 'w') as f:
+            json.dump(data, f)
+            
     def train_one_epoch(self):
         train_loss = 0
         self.model.train(True)
@@ -114,48 +134,6 @@ class BaseExperiment():
                 break
             
             print(f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f} | Validation MAE = {val_mae:.6f}")
-        
-def old_test_model(testloader, custom_training_config, custom_model_config):
-    work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
-    device = "cuda:0"
-    in_shape = custom_training_config['in_shape']
-        
-    model = _build_model(in_shape, None, custom_model_config)
-    model.load_state_dict(os.path.join(work_dir_path, 'checkpoint.pth')).to(device)
-    model.eval()
-    
-    cm = np.zeros((2, 2), dtype=int)
-    # Disable gradient computation and reduce memory consumption.
-    with torch.no_grad():
-        for inputs, labels in tqdm(testloader):
-            y_pred = model(inputs.to(device))
-            # Get only the first temporal channel
-            y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
-            
-            #TODO: compute other classification metrics
-            _y_pred = torch.argmax(F.softmax(y_pred, dim=2), dim=2).cpu().numpy()[:, 0]
-            # _labels = torch.argmax(labels).detach().numpy()
-            _labels = labels.detach().numpy()[:, 0, 1]
-            # print(_labels.shape)
-            # print(_y_pred.shape)
-            # 1/0
-            _f1_clss0, _f1_clss1 = f1_score(_y_pred, _labels)
-            _cm, _, _, _, _ = confusion_matrix(_labels, _y_pred)
-            
-            f1_clss0 += _f1_clss0.item()
-            f1_clss1 += _f1_clss1.item()
-            cm[0, 0] += _cm[0, 0]
-            cm[0, 1] += _cm[0, 1]
-            cm[1, 0] += _cm[1, 0]
-            cm[1, 1] += _cm[1, 1]
-        
-    f1_clss0 = f1_clss0 / len(testloader)
-    f1_clss1 = f1_clss1 / len(testloader)
-    
-    print("====== Confusion Matrix ======")
-    print(cm)
-    print(f'F1 Score No def: {f1_clss0:.4f} - F1 Score Def: {f1_clss1:.4f}')
-    
 
 def _build_model(in_shape, nclasses, custom_model_config, device):
     return SimVP_Model(in_shape=in_shape, nclasses=nclasses, **custom_model_config).to(device)
@@ -170,15 +148,22 @@ def test_model(testloader, custom_training_config, custom_model_config):
     # model.load_state_dict(os.path.join(work_dir_path, 'checkpoint.pth')).to(device)
     model.eval()
     
-    mse = nn.MSELoss()
-    mae = nn.L1Loss()
+    # mse = nn.MSELoss()
+    mse = WMSELoss(weight=1)
+    mae = WMAELoss(weight=1)
+    # mae = nn.L1Loss()
     
     test_loss = 0.0
     test_mae = 0.0
     # cm = np.zeros((2, 2), dtype=int)
     # Disable gradient computation and reduce memory consumption.
+    skip_cont = 0
     with torch.no_grad():
         for inputs, labels in tqdm(testloader):
+            # Check if all pixels are -1
+            if torch.all(labels == -1):
+                skip_cont += 1
+                continue
             y_pred = model(inputs.to(device))
             # Get only the first temporal channel
             y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
@@ -189,8 +174,8 @@ def test_model(testloader, custom_training_config, custom_model_config):
             test_loss += loss.detach()
             test_mae += _mae.detach()
 
-        test_loss = test_loss / len(testloader)
-        test_mae = test_mae / len(testloader)
+        test_loss = test_loss / (len(testloader) - skip_cont)
+        test_mae = test_mae / (len(testloader) - skip_cont)
     
     print("======== Metrics ========")
     print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')
@@ -199,13 +184,13 @@ def test_model(testloader, custom_training_config, custom_model_config):
     # Check if the model outputed zero por all pixels
     test_loss = 0.0
     test_mae = 0.0
-    # cm = np.zeros((2, 2), dtype=int)
     # Disable gradient computation and reduce memory consumption.
     for inputs, labels in tqdm(testloader):
         # y_pred = model(inputs.to(device))
+        if torch.all(labels == -1):
+            skip_cont += 1
+            continue
         y_pred = torch.zeros_like(labels)
-        # Get only the first temporal channel
-        # y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
         
         loss = mse(y_pred, labels)
         _mae = mae(y_pred, labels)
@@ -213,8 +198,8 @@ def test_model(testloader, custom_training_config, custom_model_config):
         test_loss += loss.detach()
         test_mae += _mae.detach()
 
-        test_loss = test_loss / len(testloader)
-        test_mae = test_mae / len(testloader)
+    test_loss = test_loss / (len(testloader) - skip_cont)
+    test_mae = test_mae / (len(testloader) - skip_cont)
     
     print("======== Zero Pred Baseline Metrics ========")
     print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')

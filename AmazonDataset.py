@@ -6,7 +6,7 @@ import os
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from preprocess import load_tif_image
+from preprocess import load_tif_image, preprocess_patches, divide_pred_windows
 from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -385,6 +385,9 @@ class IbamaInpe25km_Dataset(Dataset):
         data[data < -1e38] = 0
         data_flor[data_flor < -1e38] = 0
         data_clouds[data_clouds < -1e38] = 0
+        data[data == -1] = 0
+        data_flor[data_flor == -1] = 0
+        data_clouds[data_clouds == -1] = 0
 
         labels = load_tif_image(self.inpe_folder_path / ('ArCS' + filenames[-1] + '.tif'))
         labels[labels < -1e38] = 0
@@ -393,17 +396,23 @@ class IbamaInpe25km_Dataset(Dataset):
         # print(data.shape, labels.shape)
         # print(self.mean.shape, self.std.shape)
         
+                    
+        # print('DEBUG')
+        # print(data[data < 0])
+        # print(labels[labels < 0])
+        # 1/0
+        
         if self.normalize:
             data = data - self.mean / self.std
             data_flor = data_flor - self.mean_for / self.std_for
             data_clouds = data_clouds - self.mean_clouds / self.std_clouds
             
-        data = np.stack((data, data_flor, data_clouds), axis=1)
+        # data = np.stack((data, data_flor, data_clouds), axis=1)
         catg_fundi = np.stack((self.rodnofic, self.rodofic, self.disturb, self.distrios, self.distport,\
             self.efams_apa, self.efams_ass, self.efams_car, self.efams_fpnd, self.efams_ti, self.efams_uc), axis=0)
         catg_fundi = np.stack((catg_fundi, catg_fundi), axis=0)
-        data = np.concatenate((data, catg_fundi), axis=1)
-        # data = np.expand_dims(data, axis=1)
+        # data = np.concatenate((data, catg_fundi), axis=1)
+        data = np.expand_dims(data, axis=1)
             
         if self.transform:
             # For albumentations the image needs to be in shape (H, W, C)
@@ -415,6 +424,7 @@ class IbamaInpe25km_Dataset(Dataset):
             labels = torch.tensor(labels)
             
         # print('DEBUG')
+        # print(data[data < 0])
         # print(labels[labels < 0])
         # 1/0
             
@@ -424,103 +434,100 @@ class IbamaInpe25km_Dataset(Dataset):
 
 class IbamaDETER1km_Dataset(Dataset):
     def __init__(self, root_dir: Path, normalize: bool=True, transform: torchvision.transforms=None,
-                Debug: bool=False, mode: str='train', val_data=None, means=None, stds=None):
+                Debug: bool=False, mode: str='train', patch_size=64, overlap=0.1, min_def=0.02, window_size=3,\
+                    val_data=None, mask_val_data=None, means=None, stds=None):
         super(IbamaDETER1km_Dataset, self).__init__()
         self.root_dir = root_dir
-        inpe_folder_path = root_dir / 'INPE/tiff'
-        self.inpe_folder_path = inpe_folder_path
+        ibama_folder_path = root_dir / 'tiff_filled'
+        self.ibama_folder_path = ibama_folder_path
         if mode == 'train':
+            deter_img = load_tif_image('data/DETER/deter_increments_1km.tif')
+            
+            mask = load_tif_image('data/IBAMA_INPE/1K/tiff_filled/mask.tif')
+            # xcut = (deter_img.shape[1] // patch_size) * patch_size
+            # ycut = (deter_img.shape[2] // patch_size) * patch_size
+            # deter_img = deter_img[:, :xcut, :ycut]
+    
+            self.img_shape = deter_img.shape
+            # Each year has 24 fortnights
+            # 2017, 2018, 2019 = 3 * 24 = 72
+            deter_img_train = deter_img[:72]
+            # 2020, 2021 = 2 * 24 = 48
+            deter_img_val = deter_img[72:(72 + 48)]
+            # 2022, 2023 = 2 * 24 = 48
+            deter_img_test = deter_img[(72 + 48):(72 + 48 + 48)]
+            del deter_img
+            
+            self.mean = deter_img_train.mean()
+            self.std = deter_img_train.std()
+            
+            train_patches = preprocess_patches(deter_img_train, patch_size=patch_size, overlap=overlap)
+            del deter_img_train
+            val_patches = preprocess_patches(deter_img_val, patch_size=patch_size, overlap=0)
+            del deter_img_val
+            test_patches = preprocess_patches(deter_img_test, patch_size=patch_size, overlap=0)
+            del deter_img_test
+            
+            mask_train_patches = preprocess_patches(mask, patch_size=patch_size, overlap=overlap)
+            
+            mask_val_patches = preprocess_patches(mask, patch_size=patch_size, overlap=0)
+            
+            mask_test_patches = preprocess_patches(mask, patch_size=patch_size, overlap=0)
             
             
-            # print(len(self.data_files))
+            # self.data_files = train_patches
+            # self.val_files = val_patches
+            
+            self.data_files, self.mask_files = divide_pred_windows(train_patches, min_def=min_def, window_size=window_size,\
+                mask_patches=mask_train_patches)
+            print(f'Training shape: {self.data_files.shape}')
+            
+            # Only using min_def != 0 to speed training. Validation should not use this
+            self.val_files, self.mask_val_files = divide_pred_windows(val_patches, min_def=0.02, window_size=window_size,\
+                mask_patches=mask_val_patches)
+            print(f'Validation shape: {self.val_files.shape}')
+            
+            self.test_files, self.mask_test_files = divide_pred_windows(test_patches, min_def=0, window_size=window_size,\
+                mask_patches=mask_test_patches)
+            print(f'Test shape: {self.val_files.shape}')
+            
+            # print(mask_train_patches.shape)
             # 1/0
+            # self.mask_files = divide_pred_windows(mask_train_patches, min_def=-10, window_size=window_size)
+            # print(f'Mask Train shape: {self.mask_train_files.shape}')
+            
+            # self.mask_val_files = divide_pred_windows(mask_val_patches, min_def=-10, window_size=window_size)
+            # print(f'Mask Val shape: {self.mask_val_files.shape}')
+            
         else:
             self.data_files = val_data
+            self.mask_files = mask_val_data
             self.mean = means[0]
             self.std = stds[0]
         
         if Debug:
             self.data_files = self.data_files[:20]
-        
-        #! IBAMA
-        # Hidrografia
-        self.hidr_files = load_tif_image(inpe_folder_path / 'hidr.tif')
-        self.hidr_files = self.normalize_non_temporal(self.hidr_files)
-        # Não Floresta (Ex: Banco de Areia)
-        self.no_for_files = load_tif_image(inpe_folder_path / 'nf.tif')
-        self.no_for_files = self.normalize_non_temporal(self.no_for_files)
-        # Categorias Fundiarias
-        self.rodnofic = load_tif_image(inpe_folder_path / 'rodnofic.tif')
-        self.rodofic = load_tif_image(inpe_folder_path / 'rodofic.tif')
-        self.disturb = load_tif_image(inpe_folder_path / 'distUrb.tif')
-        self.distrios = load_tif_image(inpe_folder_path / 'distrios.tif')
-        self.distport = load_tif_image(inpe_folder_path / 'distport.tif')
-        self.efams_apa = load_tif_image(inpe_folder_path / 'EFAMS_APA.tif')
-        self.efams_ass = load_tif_image(inpe_folder_path / 'EFAMS_ASS.tif')
-        self.efams_car = load_tif_image(inpe_folder_path / 'EFAMS_CAR.tif')
-        self.efams_fpnd = load_tif_image(inpe_folder_path / 'EFAMS_FPND.tif')
-        self.efams_ti = load_tif_image(inpe_folder_path / 'EFAMS_TI.tif')
-        self.efams_uc = load_tif_image(inpe_folder_path / 'EFAMS_UC.tif')
-        
-        self.rodnofic = self.normalize_non_temporal(self.rodnofic)
-        self.rodofic = self.normalize_non_temporal(self.rodofic)
-        self.disturb = self.normalize_non_temporal(self.disturb)
-        self.distrios = self.normalize_non_temporal(self.distrios)
-        self.distport = self.normalize_non_temporal(self.distport)
-        self.efams_apa = self.normalize_non_temporal(self.efams_apa)
-        self.efams_ass = self.normalize_non_temporal(self.efams_ass)
-        self.efams_car = self.normalize_non_temporal(self.efams_car)
-        self.efams_fpnd = self.normalize_non_temporal(self.efams_fpnd)
-        self.efams_ti = self.normalize_non_temporal(self.efams_ti)
-        self.efams_uc = self.normalize_non_temporal(self.efams_uc)
             
         self.normalize = normalize
         self.transform = transform
     
-    def normalize_non_temporal(self, data):
+    def normalize_non_temporal(self, data, cut=None):
         '''Normalize the non-temporal channels'''
         data[data < -1e38] = -1
         _data = data[data != -1]
         mean = _data.mean(axis=0)
         std = _data.std(axis=0)
         print('Mean:', mean, 'Std:', std)
-        return (data - mean) / std
+        data = (data - mean) / std
+        if cut is not None:
+            data = data[:cut[0], :cut[1]]
+        return data
     
     def get_validation_set(self):
-        return self.val_files
+        return self.val_files, self.mask_val_files
     
     def get_test_set(self):
-        return self.test_files
-    
-    def _get_mean_std(self, data_files, data_type='ArCS'):
-        '''Get mean and std of the dataset'''
-        # print(self.data_files)
-        # print(type(data_files))
-        if type(data_files) == list:
-            df = pd.concat(data_files).to_frame(name='date')
-        else:
-            df = data_files.copy()
-        df.drop_duplicates(inplace=True)
-        if data_type == 'nv':
-            df['date_str'] = df['date'].dt.strftime('%Y%m%d')
-        else:
-            df['date_str'] = df['date'].dt.strftime('%d%m%y')
-            
-        for i, file in enumerate(df.date_str):
-            # img = load_tif_image(self.inpe_folder_path / ('ArCS' + file + '.tif'))
-            # print(data_type + file + '.tif')
-            img = load_tif_image(self.inpe_folder_path / (data_type + file + '.tif'))
-            if i == 0:
-                data = np.expand_dims(img, axis=0)
-            else:
-                data = np.concatenate((data, np.expand_dims(img, axis=0)), axis=0)
-        # Calculates the mean and std only for amazon pixels (Excluding the background)
-        data[data < -1e38] = -1
-        data = data[data != -1]
-        mean = data.mean(axis=0)
-        std = data.std(axis=0)
-        print('Mean:', mean, 'Std:', std)
-        return mean, std
+        return self.test_files, self.mask_test_files
     
     def sliding_window(self, input_list, window_size):
         result = []
@@ -535,39 +542,29 @@ class IbamaDETER1km_Dataset(Dataset):
     def __getitem__(self, index):
         # print(self.root_dir / self.data_files[index])
         patch_window = self.data_files[index]
-        # print(patch_window)
-        df = patch_window.to_frame(name='date')
-        df['date_str'] = df['date'].dt.strftime('%d%m%y')
-        # print(patch_window.shape)
-        filenames = df['date_str'].to_list()
-        for i, file in enumerate(filenames[:-1]):
-            # print(file)
-            img = load_tif_image(self.inpe_folder_path / ('ArCS' + file + '.tif'))
- 
-            if i == 0:
-                data = np.expand_dims(img, axis=0)
-            else:
-                data = np.concatenate((data, np.expand_dims(img, axis=0)), axis=0)
+        mask = self.mask_files[index]
         
-        data[data < -1e38] = 0
-
-        labels = load_tif_image(self.inpe_folder_path / ('ArCS' + filenames[-1] + '.tif'))
-        labels[labels < -1e38] = 0
-        labels[labels == -1] = 0
+        data = patch_window[:-1]
+        labels = patch_window[-1]
+        
+        # Apply Legal Amazon Mask
+        # No negative values should be present in input data
+        data[:, mask == 0] = -1
+        data[data == -1] = 0
+        # Negative values will be filtered in the cost function
+        labels[mask == 0] = -1
         
         # print(data.shape, labels.shape)
         # print(self.mean.shape, self.std.shape)
         
         if self.normalize:
             data = data - self.mean / self.std
-            data_flor = data_flor - self.mean_for / self.std_for
-            data_clouds = data_clouds - self.mean_clouds / self.std_clouds
             
-        catg_fundi = np.stack((self.rodnofic, self.rodofic, self.disturb, self.distrios, self.distport,\
-            self.efams_apa, self.efams_ass, self.efams_car, self.efams_fpnd, self.efams_ti, self.efams_uc), axis=0)
-        catg_fundi = np.stack((catg_fundi, catg_fundi), axis=0)
-        data = np.concatenate((data, catg_fundi), axis=1)
-        # data = np.expand_dims(data, axis=1)
+        # catg_fundi = np.stack((self.rodnofic, self.rodofic, self.disturb, self.distrios, self.distport,\
+        #     self.efams_apa, self.efams_ass, self.efams_car, self.efams_fpnd, self.efams_ti, self.efams_uc), axis=0)
+        # catg_fundi = np.stack((catg_fundi, catg_fundi), axis=0)
+        # data = np.concatenate((data, catg_fundi), axis=1)
+        data = np.expand_dims(data, axis=1)
             
         if self.transform:
             # For albumentations the image needs to be in shape (H, W, C)
@@ -577,9 +574,5 @@ class IbamaDETER1km_Dataset(Dataset):
         else:
             data = torch.tensor(data)
             labels = torch.tensor(labels)
-            
-        # print('DEBUG')
-        # print(labels[labels < 0])
-        # 1/0
             
         return data.float(), labels.unsqueeze(0).unsqueeze(0).float()

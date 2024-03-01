@@ -1,6 +1,6 @@
 
 import torch
-from AmazonDataset import IbamaInpe25km_Dataset
+from AmazonDataset import IbamaInpe25km_Dataset, IbamaDETER1km_Dataset
 from pathlib import Path
 import numpy as np
 from openstl.utils import create_parser, default_parser
@@ -22,38 +22,18 @@ def apply_legal_amazon_mask(input_image: np.array, amazon_mask: np.array):
         input_image[i, :, :][amazon_mask == 2.0] = 2
     return input_image
 
-# root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/Dataset/DETR_Patches')
-root_dir = Path('/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE/25K')
-
-print(root_dir)
-batch_size = 8
+batch_size = 16
 num_workers = 8
 Debug = False
+pixel_size = '1K'
 
-# Calculate weights
-# mask_path = '/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/area.tif'
-# train_path = '/home/thiago/AmazonDeforestation_Prediction/AmazonData/Dataset_Felipe/train.tif'
-# mask = load_tif_image(mask_path)
-# img_train = load_tif_image(train_path)
-# img_train = img_train.reshape((3, -1, img_train.shape[1], img_train.shape[2])).max(axis=0)
+patch_size = 64
+overlap = 0.1
+window_size = 3
+min_def = 0.02
 
-# mask[mask == 0.0] = 2.0
-# mask[mask == 1] = 0.0
-# print(mask.shape)
-
-# img_train = apply_legal_amazon_mask(img_train, mask)
-
-# class0_pixels = np.sum(img_train == 0)
-# class1_pixels = np.sum(img_train == 1)
-# total_pixels = class0_pixels + class1_pixels
-
-# print(f'Class numbers: 0: {class0_pixels} - 1: {class1_pixels} - Total: {total_pixels} - Shape: {img_train.shape[0] * img_train.shape[1] * img_train.shape[2]}')
-# print(f'Class percentages: 0: {class0_pixels / total_pixels} - 1: {class1_pixels / total_pixels}')
-# # loss_weights = [int(total_pixels / class0_pixels), int(total_pixels / class1_pixels)]
-# # loss_weights = [1 - (class0_pixels / total_pixels), 1 - (class1_pixels / total_pixels)]
-# # loss_weights = [0.05, 0.95]
-# loss_weights = None # Tentar 0.6 e 0.4
-# print(f'Loss weights: {loss_weights}')
+root_dir = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE/{pixel_size}')
+print(root_dir)
 
 prob = 0.5
 copy_fn = lambda x, **kwargs: x.copy()
@@ -66,11 +46,21 @@ transform = A.Compose(
     ], is_check_shapes=False
 )
 
-# train_set = CustomDataset(root_dir=root_dir / 'Train', Debug=Debug, transform=transform)
-# val_set = CustomDataset(root_dir=root_dir / 'Val', Debug=Debug)
-train_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, transform=transform)
-val_data = train_set.get_validation_set()
-val_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=val_data, means=[train_set.mean, train_set.mean_for, train_set.mean_clouds], stds=[train_set.std, train_set.std_for, train_set.std_clouds])
+if pixel_size == '25K':
+    train_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, transform=transform)
+    val_data = train_set.get_validation_set()
+    val_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=val_data,\
+        means=[train_set.mean, train_set.mean_for, train_set.mean_clouds], stds=[train_set.std, train_set.std_for, train_set.std_clouds])
+    width = 136
+    height = 98
+elif pixel_size == '1K':
+    train_set = IbamaDETER1km_Dataset(root_dir=root_dir, Debug=Debug, transform=transform,\
+        patch_size=patch_size, overlap=overlap, min_def=min_def, window_size=window_size)
+    val_data, mask_val_data = train_set.get_validation_set()
+    val_set = IbamaDETER1km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', patch_size=patch_size,\
+        val_data=val_data, mask_val_data=mask_val_data, means=[train_set.mean], stds=[train_set.std])
+    width = patch_size
+    height = patch_size
 
 print(len(train_set), len(val_set))
 
@@ -93,10 +83,13 @@ custom_training_config = {
 
     'ex_name': 'custom_exp09', # custom_exp
     'dataname': 'custom',
-    'in_shape': [2, 14, 98, 136], # T, C, H, W = self.args.in_shape
+    'in_shape': [2, 1, height, width], # T, C, H, W = self.args.in_shape
     'patience': 10,
-    'delta': 0.001,
-    'amazon_mask': True
+    'delta': 0.0001,
+    'amazon_mask': True,
+    'pixel_size': pixel_size,
+    'patch_size': patch_size,
+    'overlap': overlap
 }
 
 custom_model_config = {
@@ -118,9 +111,15 @@ exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, cust
 
 exp.train()
 
-test_data = train_set.get_test_set()
-test_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data, means=[train_set.mean, train_set.mean_for, train_set.mean_clouds], stds=[train_set.std, train_set.std_for, train_set.std_clouds])
-    
+#TODO: pass test patches to the experiment
+if pixel_size == '25K':
+    test_data, _ = train_set.get_test_set()
+    test_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data, means=[train_set.mean, train_set.mean_for, train_set.mean_clouds], stds=[train_set.std, train_set.std_for, train_set.std_clouds])
+elif pixel_size == '1K':
+    test_data, mask_test_data = train_set.get_test_set()
+    test_set = IbamaDETER1km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data,\
+        mask_val_data=mask_test_data, means=[train_set.mean], stds=[train_set.std])
+
 dataloader_test = torch.utils.data.DataLoader(
     test_set, batch_size=batch_size, shuffle=False, pin_memory=True)
 
