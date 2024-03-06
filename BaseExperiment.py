@@ -10,7 +10,7 @@ from metrics import confusion_matrix, f1_score
 import numpy as np
 import torch.nn.functional as F
 from torchsummary import summary
-from preprocess import load_tif_image, preprocess_patches, divide_pred_windows
+from preprocess import load_tif_image, preprocess_patches, divide_pred_windows, reconstruct_sorted_patches
 
 from sklearn.metrics import f1_score as skf1_score
 from CustomLosses import WMSELoss, WMAELoss
@@ -158,6 +158,7 @@ def test_model(testloader, custom_training_config, custom_model_config):
     # cm = np.zeros((2, 2), dtype=int)
     # Disable gradient computation and reduce memory consumption.
     skip_cont = 0
+    preds = []
     with torch.no_grad():
         for inputs, labels in tqdm(testloader):
             # Check if all pixels are -1
@@ -168,17 +169,54 @@ def test_model(testloader, custom_training_config, custom_model_config):
             # Get only the first temporal channel
             y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
             
-            loss = mse(y_pred, labels.to(device))
-            _mae = mae(y_pred, labels.to(device))
-                
-            test_loss += loss.detach()
-            test_mae += _mae.detach()
+            if torch.all(labels == -1):
+                skip_cont += 1
+                # continue
+                loss = mse(y_pred, labels.to(device))
+                _mae = mae(y_pred, labels.to(device))
+                    
+                test_loss += loss.detach()
+                test_mae += _mae.detach()
+            
+            # print(y_pred.cpu().numpy()[0, 0, 0].shape)
+            preds.append(y_pred.cpu().numpy()[0, 0, 0])  
 
         test_loss = test_loss / (len(testloader) - skip_cont)
         test_mae = test_mae / (len(testloader) - skip_cont)
     
     print("======== Metrics ========")
     print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')
+    preds = np.stack(preds, axis=0)
+    print(preds.shape)
+    
+    div_time = preds.shape[0] // 44
+    patches = []
+    for i in range(0, div_time):
+        windowed_patch = preds[i * 44: (i + 1) * 44]
+        print(windowed_patch.shape)
+        # windowed_indexes = indexes[i * 46: (i + 1) * 46]
+        
+        # init_patches = windowed_patch[0]
+        # non_duplicated = windowed_patch[1:, -1]
+        # print(init_patches.shape)
+        # print(non_duplicated.shape)
+        # patches_t = np.concatenate((init_patches, non_duplicated), axis=0)
+        # print(patches_t.shape)
+        # patches = np.concatenate((patches, np.expand_dims(patches_t, axis=0)), axis=0)
+        patches.append(windowed_patch)
+        # print(patches.shape)
+    patches = np.stack(patches, axis=0)
+    print(patches.shape)
+    
+    images_reconstructed = []
+    for i in range(patches.shape[1]):
+        print(patches[i].shape)
+        img_reconstructed = reconstruct_sorted_patches(patches[:, i], (2333, 3005), patch_size=64)
+        print(img_reconstructed.shape)
+        images_reconstructed.append(img_reconstructed)
+        
+    np.save('reconstructed_images.npy', np.stack(images_reconstructed, axis=0))
+    1/0
     
     #! Baseline test
     # Check if the model outputed zero por all pixels
