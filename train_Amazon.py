@@ -107,9 +107,9 @@ custom_model_config = {
     'hid_T': 128 # default: 256
 }
 
-exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
+# exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
 
-exp.train()
+# exp.train()
 
 #TODO: pass test patches to the experiment
 if pixel_size == '25K':
@@ -121,6 +121,6 @@ elif pixel_size == '1K':
         mask_val_data=mask_test_data, means=[train_set.mean], stds=[train_set.std])
 
 dataloader_test = torch.utils.data.DataLoader(
-    test_set, batch_size=batch_size, shuffle=False, pin_memory=True)
+    test_set, batch_size=1, shuffle=False, pin_memory=True)
 
 test_model(dataloader_test, custom_training_config, custom_model_config)

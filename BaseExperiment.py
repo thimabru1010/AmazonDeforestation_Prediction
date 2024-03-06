@@ -162,9 +162,9 @@ def test_model(testloader, custom_training_config, custom_model_config):
     with torch.no_grad():
         for inputs, labels in tqdm(testloader):
             # Check if all pixels are -1
-            if torch.all(labels == -1):
-                skip_cont += 1
-                continue
+            # if torch.all(labels == -1):
+            #     skip_cont += 1
+            #     continue
             y_pred = model(inputs.to(device))
             # Get only the first temporal channel
             y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
