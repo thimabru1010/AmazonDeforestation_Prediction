@@ -10,7 +10,7 @@ from metrics import confusion_matrix, f1_score
 import numpy as np
 import torch.nn.functional as F
 from torchsummary import summary
-from preprocess import load_tif_image, preprocess_patches, divide_pred_windows, reconstruct_sorted_patches
+from preprocess import load_tif_image, preprocess_patches, divide_pred_windows, reconstruct_sorted_patches, reconstruct_time_patches
 
 from sklearn.metrics import f1_score as skf1_score
 from CustomLosses import WMSELoss, WMAELoss
@@ -189,24 +189,26 @@ def test_model(testloader, custom_training_config, custom_model_config):
     preds = np.stack(preds, axis=0)
     print(preds.shape)
     
-    div_time = preds.shape[0] // 44
-    patches = []
-    for i in range(0, div_time):
-        windowed_patch = preds[i * 44: (i + 1) * 44]
-        print(windowed_patch.shape)
-        patches.append(windowed_patch)
-        # print(patches.shape)
-    patches = np.stack(patches, axis=0)
-    print(patches.shape)
+    # 44 = 46 - 2
+    # div_time = preds.shape[0] // 44
+    # patches = []
+    # for i in range(0, div_time):
+    #     windowed_patch = preds[i * 44: (i + 1) * 44]
+    #     print(windowed_patch.shape)
+    #     patches.append(windowed_patch)
+    #     # print(patches.shape)
+    # patches = np.stack(patches, axis=0)
+    # print(patches.shape)
     
-    images_reconstructed = []
-    for i in range(patches.shape[1]):
-        print(patches[i].shape)
-        img_reconstructed = reconstruct_sorted_patches(patches[:, i], (2333, 3005), patch_size=64)
-        print(img_reconstructed.shape)
-        images_reconstructed.append(img_reconstructed)
+    # images_reconstructed = []
+    # for i in range(patches.shape[1]):
+    #     print(patches[i].shape)
+    #     img_reconstructed = reconstruct_sorted_patches(patches[:, i], (2333, 3005), patch_size=64)
+    #     print(img_reconstructed.shape)
+    #     images_reconstructed.append(img_reconstructed)
         
-    np.save('reconstructed_images.npy', np.stack(images_reconstructed, axis=0))
+    # np.save('reconstructed_images.npy', np.stack(images_reconstructed, axis=0))
+    _ = reconstruct_time_patches(preds, patch_size=64, time_idx=44, original_img_shape=(2333, 3005))
     1/0
     
     #! Baseline test

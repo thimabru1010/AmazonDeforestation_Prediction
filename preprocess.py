@@ -47,6 +47,25 @@ def preprocess_patches(img: np.ndarray, patch_size: int, overlap: int):
     print(f'Patches extracted: {patches.shape}')
     return patches
 
+def reconstruct_time_patches(preds: np.ndarray, patch_size: int=64, time_idx: int=44, original_img_shape: tuple=(2333, 3005)):
+    #! OBS: 44 = 46 - 2
+    # 46 é o número de quinzenas em grupos de 3. 2 são as duas quinzenas iniciais usadas para a primeira previsão.
+    div_time = preds.shape[0] // time_idx
+    patches = []
+    for i in range(div_time):
+        windowed_patch = preds[i * time_idx: (i + 1) * time_idx]
+        patches.append(windowed_patch)
+        # print(patches.shape)
+    patches = np.stack(patches, axis=0)
+    
+    images_reconstructed = []
+    for i in range(patches.shape[1]):
+        img_reconstructed = reconstruct_sorted_patches(patches[:, i], original_img_shape, patch_size=patch_size)
+        images_reconstructed.append(img_reconstructed)
+        
+    np.save('data/reconstructed_images.npy', np.stack(images_reconstructed, axis=0))
+    return np.stack(images_reconstructed, axis=0)
+
 def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=3, mask_patches: np.ndarray=None) -> np.ndarray:
     skipped_count = 0
     # if mask_patches is not None:
