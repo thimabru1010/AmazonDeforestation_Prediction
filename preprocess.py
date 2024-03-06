@@ -9,37 +9,6 @@ from tqdm import tqdm
 from time import time
 
 gdal.PushErrorHandler('CPLQuietErrorHandler')
-
-def plot_images(image1, image2, area):
-    # Create a figure and axes with two subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))  # 1 row, 2 columns
-
-    # Display the image using imshow
-    cax1 = ax1.imshow(img_train[30, :, :])
-    # Add a colorbar to the plot
-    cbar1 = fig.colorbar(cax1)
-
-    # Optionally, you can set axis labels and a title
-    ax1.set_xlabel('X Label')
-    ax1.set_ylabel('Y Label')
-    ax1.set_title('Image Plot')
-
-    # Display the image using imshow
-    cax2 = ax2.imshow(mask)
-    # Add a colorbar to the plot
-    cbar2 = fig.colorbar(cax2)
-
-    # Optionally, you can set axis labels and a title
-    ax2.set_xlabel('X Label')
-    ax2.set_ylabel('Y Label')
-    ax2.set_title('Image Plot')
-
-    # Adjust spacing between subplots
-    plt.tight_layout()
-
-    # Show the plot
-    plt.show()
-
 def load_tif_image(tif_path):
     gdal_header = gdal.Open(str(tif_path))
     return gdal_header.ReadAsArray()
@@ -54,6 +23,23 @@ def extract_patches(image: np.ndarray, patch_size: int, stride: int) -> np.ndarr
         print(image.shape)
         return np.array(view_as_windows(image, window_shape_array, step=stride)).reshape((-1,) + window_shape_array)
 
+def extract_sorted_patches(img, patch_size):
+    patches = []
+    for i in range(0, img.shape[0] - patch_size + 1, patch_size):
+        for j in range(0, img.shape[1] - patch_size + 1, patch_size):
+            patch = img[i:i + patch_size, j:j + patch_size]
+            patches.append(patch)
+    return np.stack(patches, axis=0)
+
+def reconstruct_sorted_patches(patches, img_shape, patch_size):
+    img = np.zeros(img_shape)
+    idx = 0
+    for i in range(0, img_shape[0] - patch_size + 1, patch_size):
+        for j in range(0, img_shape[1] - patch_size + 1, patch_size):
+            img[i:i + patch_size, j:j + patch_size] = patches[idx]
+            idx += 1
+    return img
+
 def preprocess_patches(img: np.ndarray, patch_size: int, overlap: int):
     print('Extracting patches...')
     stride = int((1-overlap)*patch_size)
@@ -66,11 +52,11 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=3,
     # if mask_patches is not None:
     windowed_mask_patches = []
     windowed_patches = []
+    # indexes = []
     total_iterations = patches.shape[0] * (patches.shape[1] - window_size + 1)
     with tqdm(total=total_iterations, desc='Dividing in prediction windows') as pbar:
         # Loop trough patches
         for i, patch in enumerate(patches):
-            # print(patch.shape)
             # Loop through time
             for j in range(patch.shape[0] - window_size + 1):
                 windowed_patch = patch[j:j+window_size]
@@ -79,6 +65,7 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=3,
                     skipped_count += 1
                     pbar.update(1)
                     continue
+                # indexes.append((i, j, j+window_size))
                 windowed_patches.append(windowed_patch)
                 if mask_patches is not None:
                     windowed_mask_patches.append(mask_patches[i])
@@ -88,10 +75,9 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=3,
         windowed_mask_patches = np.concatenate(windowed_mask_patches, axis=0).reshape((-1,) + mask_patches.shape[1:])
     else:
         windowed_mask_patches = None
-    return np.concatenate(windowed_patches, axis=0).reshape((-1, window_size) + patches.shape[2:]), windowed_mask_patches
+    return np.concatenate(windowed_patches, axis=0).reshape((-1, window_size) + patches.shape[2:]), windowed_mask_patches#, indexes
 
-def prep_INPE25km(img_train: np.ndarray, img_test: np.ndarray, mask: np.ndarray, args: argparse.Namespace):
-    pass
+
 
 def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, window_size: int=5):
     folder_path = save_path / modality

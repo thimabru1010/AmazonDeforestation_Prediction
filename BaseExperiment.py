@@ -194,15 +194,6 @@ def test_model(testloader, custom_training_config, custom_model_config):
     for i in range(0, div_time):
         windowed_patch = preds[i * 44: (i + 1) * 44]
         print(windowed_patch.shape)
-        # windowed_indexes = indexes[i * 46: (i + 1) * 46]
-        
-        # init_patches = windowed_patch[0]
-        # non_duplicated = windowed_patch[1:, -1]
-        # print(init_patches.shape)
-        # print(non_duplicated.shape)
-        # patches_t = np.concatenate((init_patches, non_duplicated), axis=0)
-        # print(patches_t.shape)
-        # patches = np.concatenate((patches, np.expand_dims(patches_t, axis=0)), axis=0)
         patches.append(windowed_patch)
         # print(patches.shape)
     patches = np.stack(patches, axis=0)
