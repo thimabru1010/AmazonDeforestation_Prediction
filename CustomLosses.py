@@ -7,7 +7,7 @@ class WMSELoss(nn.Module):
         self.weight = weight
         self.ignore_pixel = ignore_pixel
 
-    def forward(self, y_pred, y_true):      
+    def forward(self, y_pred, y_true):
         y_pred = y_pred[y_true != self.ignore_pixel]
         y_true = y_true[y_true != self.ignore_pixel]
         

@@ -46,11 +46,6 @@ class BaseExperiment():
                 mask = load_tif_image('data/IBAMA_INPE/25K/INPE/tiff/mask.tif')
             elif custom_training_config['pixel_size'] == '1K':
                 pass
-                # mask = mask_patches
-                # mask = load_tif_image('data/IBAMA_INPE/1K/tiff_filled/mask.tif')
-                # xcut = (mask.shape[0] // custom_training_config['patch_size']) * custom_training_config['patch_size']
-                # ycut = (mask.shape[1] // custom_training_config['patch_size']) * custom_training_config['patch_size']
-                # mask = mask[:img_full_shape[1], :img_full_shape[2]]
             # mask = None
             self.loss = WMSELoss(weight=1)
             self.mae = WMAELoss(weight=1)
@@ -78,7 +73,7 @@ class BaseExperiment():
             
             y_pred = self.model(inputs.to(self.device))
             # Get only the first temporal channel
-            y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
+            y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
             
             loss = self.loss(y_pred, labels.to(self.device))
             loss.backward()
@@ -100,7 +95,7 @@ class BaseExperiment():
             for inputs, labels in tqdm(self.valloader):
                 y_pred = self.model(inputs.to(self.device))
                 # Get only the first temporal channel
-                y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
+                y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
                 loss = self.loss(y_pred, labels.to(self.device))
                 mae = self.mae(y_pred, labels.to(self.device))
                 
@@ -167,7 +162,7 @@ def test_model(testloader, custom_training_config, custom_model_config):
             #     continue
             y_pred = model(inputs.to(device))
             # Get only the first temporal channel
-            y_pred = y_pred[:, 0].contiguous().unsqueeze(1)
+            y_pred = y_pred[:, :2].contiguous().unsqueeze(1)
             
             if torch.all(labels == -1):
                 skip_cont += 1
@@ -209,7 +204,6 @@ def test_model(testloader, custom_training_config, custom_model_config):
         
     # np.save('reconstructed_images.npy', np.stack(images_reconstructed, axis=0))
     _ = reconstruct_time_patches(preds, patch_size=64, time_idx=44, original_img_shape=(2333, 3005))
-    1/0
     
     #! Baseline test
     # Check if the model outputed zero por all pixels

@@ -434,14 +434,14 @@ class IbamaInpe25km_Dataset(Dataset):
 
 class IbamaDETER1km_Dataset(Dataset):
     def __init__(self, root_dir: Path, normalize: bool=True, transform: torchvision.transforms=None,
-                Debug: bool=False, mode: str='train', patch_size=64, overlap=0.1, min_def=0.02, window_size=3,\
+                Debug: bool=False, mode: str='train', patch_size=64, overlap=0.1, min_def=0.02, window_size=6,\
                     val_data=None, mask_val_data=None, means=None, stds=None):
         super(IbamaDETER1km_Dataset, self).__init__()
         self.root_dir = root_dir
         ibama_folder_path = root_dir / 'tiff_filled'
         self.ibama_folder_path = ibama_folder_path
         if mode == 'train':
-            deter_img = load_tif_image('data/DETER/deter_increments_1km.tif')
+            deter_img = load_tif_image('data/DETER/deter_increments_1km_week.tif')
             
             mask = load_tif_image('data/IBAMA_INPE/1K/tiff_filled/mask.tif')
             # xcut = (deter_img.shape[1] // patch_size) * patch_size
@@ -449,13 +449,13 @@ class IbamaDETER1km_Dataset(Dataset):
             # deter_img = deter_img[:, :xcut, :ycut]
     
             self.img_shape = deter_img.shape
-            # Each year has 24 fortnights
-            # 2017, 2018, 2019 = 3 * 24 = 72
-            deter_img_train = deter_img[:72]
-            # 2020, 2021 = 2 * 24 = 48
-            deter_img_val = deter_img[72:(72 + 48)]
-            # 2022, 2023 = 2 * 24 = 48
-            deter_img_test = deter_img[(72 + 48):(72 + 48 + 48)]
+            # Each year has 48 weeks
+            # 2020, 2021 = 2 * 48 = 96
+            deter_img_train = deter_img[:96]
+            # 2022 = 1 * 48 = 48
+            deter_img_val = deter_img[96:(96 + 48)]
+            # 2023 = 1 * 48 = 48
+            deter_img_test = deter_img[(96 + 48):(96 + 48 + 48)]
             del deter_img
             
             self.mean = deter_img_train.mean()
@@ -477,7 +477,6 @@ class IbamaDETER1km_Dataset(Dataset):
             
             # self.data_files = train_patches
             # self.val_files = val_patches
-            
             self.data_files, self.mask_files = divide_pred_windows(train_patches, min_def=min_def, window_size=window_size,\
                 mask_patches=mask_train_patches)
             print(f'Training shape: {self.data_files.shape}')
@@ -491,13 +490,6 @@ class IbamaDETER1km_Dataset(Dataset):
                 mask_patches=mask_test_patches)
             print(f'Test shape: {self.val_files.shape}')
             
-            # print(mask_train_patches.shape)
-            # 1/0
-            # self.mask_files = divide_pred_windows(mask_train_patches, min_def=-10, window_size=window_size)
-            # print(f'Mask Train shape: {self.mask_train_files.shape}')
-            
-            # self.mask_val_files = divide_pred_windows(mask_val_patches, min_def=-10, window_size=window_size)
-            # print(f'Mask Val shape: {self.mask_val_files.shape}')
             
         else:
             self.data_files = val_data
@@ -542,17 +534,18 @@ class IbamaDETER1km_Dataset(Dataset):
     def __getitem__(self, index):
         # print(self.root_dir / self.data_files[index])
         patch_window = self.data_files[index]
+        # print(patch_window.shape)
         mask = self.mask_files[index]
         
-        data = patch_window[:-1]
-        labels = patch_window[-1]
+        data = patch_window[:-2]
+        labels = patch_window[-2:]
         
         # Apply Legal Amazon Mask
         # No negative values should be present in input data
         data[:, mask == 0] = -1
         data[data == -1] = 0
         # Negative values will be filtered in the cost function
-        labels[mask == 0] = -1
+        labels[:, mask == 0] = -1
         
         # print(data.shape, labels.shape)
         # print(self.mean.shape, self.std.shape)
@@ -560,10 +553,6 @@ class IbamaDETER1km_Dataset(Dataset):
         if self.normalize:
             data = data - self.mean / self.std
             
-        # catg_fundi = np.stack((self.rodnofic, self.rodofic, self.disturb, self.distrios, self.distport,\
-        #     self.efams_apa, self.efams_ass, self.efams_car, self.efams_fpnd, self.efams_ti, self.efams_uc), axis=0)
-        # catg_fundi = np.stack((catg_fundi, catg_fundi), axis=0)
-        # data = np.concatenate((data, catg_fundi), axis=1)
         data = np.expand_dims(data, axis=1)
             
         if self.transform:
@@ -574,5 +563,5 @@ class IbamaDETER1km_Dataset(Dataset):
         else:
             data = torch.tensor(data)
             labels = torch.tensor(labels)
-            
-        return data.float(), labels.unsqueeze(0).unsqueeze(0).float()
+         
+        return data.float(), labels.unsqueeze(1).float()

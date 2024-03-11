@@ -29,7 +29,7 @@ pixel_size = '1K'
 
 patch_size = 64
 overlap = 0.1
-window_size = 3
+window_size = 6
 min_def = 0.02
 
 root_dir = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE/{pixel_size}')
@@ -71,9 +71,9 @@ dataloader_val = torch.utils.data.DataLoader(
     
 # Exp17 training with categories 2 in input
 custom_training_config = {
-    'pre_seq_length': 2,
-    'aft_seq_length': 1,
-    'total_length': 3,
+    'pre_seq_length': 4,
+    'aft_seq_length': 2,
+    'total_length': 6,
     'batch_size': batch_size,
     'val_batch_size': batch_size,
     'epoch': 100,
@@ -81,9 +81,9 @@ custom_training_config = {
     # 'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score', 'CM'],
     'metrics': ['mse', 'mae'],
 
-    'ex_name': 'custom_exp09', # custom_exp
+    'ex_name': 'custom_exp10', # custom_exp
     'dataname': 'custom',
-    'in_shape': [2, 1, height, width], # T, C, H, W = self.args.in_shape
+    'in_shape': [4, 1, height, width], # T, C, H, W = self.args.in_shape
     'patience': 10,
     'delta': 0.0001,
     'amazon_mask': True,
@@ -107,9 +107,9 @@ custom_model_config = {
     'hid_T': 128 # default: 256
 }
 
-# exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
+exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
 
-# exp.train()
+exp.train()
 
 #TODO: pass test patches to the experiment
 if pixel_size == '25K':

@@ -66,7 +66,7 @@ def reconstruct_time_patches(preds: np.ndarray, patch_size: int=64, time_idx: in
     np.save('data/reconstructed_images.npy', np.stack(images_reconstructed, axis=0))
     return np.stack(images_reconstructed, axis=0)
 
-def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=3, mask_patches: np.ndarray=None) -> np.ndarray:
+def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6, pred_horizon: int=2, mask_patches: np.ndarray=None) -> np.ndarray:
     skipped_count = 0
     # if mask_patches is not None:
     windowed_mask_patches = []
@@ -76,11 +76,11 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=3,
     with tqdm(total=total_iterations, desc='Dividing in prediction windows') as pbar:
         # Loop trough patches
         for i, patch in enumerate(patches):
-            # Loop through time
+            # Loop through time windows
             for j in range(patch.shape[0] - window_size + 1):
                 windowed_patch = patch[j:j+window_size]
-                label = windowed_patch[-1]
-                if np.mean(label > 0, axis=(0, 1)) < min_def:
+                label = windowed_patch[-pred_horizon:]
+                if np.mean(label > 0, axis=(0, 1, 2)) < min_def:
                     skipped_count += 1
                     pbar.update(1)
                     continue
@@ -95,7 +95,6 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=3,
     else:
         windowed_mask_patches = None
     return np.concatenate(windowed_patches, axis=0).reshape((-1, window_size) + patches.shape[2:]), windowed_mask_patches#, indexes
-
 
 
 def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, window_size: int=5):
