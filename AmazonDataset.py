@@ -441,7 +441,7 @@ class IbamaDETER1km_Dataset(Dataset):
         ibama_folder_path = root_dir / 'tiff_filled'
         self.ibama_folder_path = ibama_folder_path
         if mode == 'train':
-            deter_img = load_tif_image('data/DETER/deter_increments_1km_week.tif')
+            deter_img = load_tif_image('data/DETER/deter_increments_1km_1week.tif')
             
             mask = load_tif_image('data/IBAMA_INPE/1K/tiff_filled/mask.tif')
             # xcut = (deter_img.shape[1] // patch_size) * patch_size
@@ -543,7 +543,7 @@ class IbamaDETER1km_Dataset(Dataset):
         # Apply Legal Amazon Mask
         # No negative values should be present in input data
         data[:, mask == 0] = -1
-        data[data == -1] = 0
+        # data[data == -1] = 0
         # Negative values will be filtered in the cost function
         labels[:, mask == 0] = -1
         

@@ -31,34 +31,40 @@ class BaseExperiment():
         self.delta = custom_training_config['delta']
         self.device = "cuda:0"
         in_shape = custom_training_config['in_shape']
-        # img_full_shape = custom_training_config['img_shape']
-        torch.manual_seed(seed)
         
         print('Input shape:', in_shape)
-        self.model = self._build_model(in_shape, None, custom_model_config)
+        torch.manual_seed(seed)
+        self.model = self._build_model(in_shape, custom_model_config['num_classes'], custom_model_config)
+        
+        if custom_model_config['num_classes']:
+            self.classification = True
+            if custom_training_config['loss'] == 'focal':
+                self.loss = FocalLoss(mode='multiclass', alpha=0.25, gamma=4.0, ignore_index=-1)
+            elif custom_training_config['loss'] == 'ce':
+                class_weights = torch.tensor([1, 1], dtype=torch.float32).to(self.device)
+                self.loss = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
+            #TODO: add auxiliary metrics
+        else:
+            self.classification = False
+            self.loss = WMSELoss(weight=1)
+            # TODO: add auxiliary metrics
+            self.mae = WMAELoss(weight=1)
         
         print(summary(self.model, tuple(in_shape)))
         
         self.optm = optm.Adam(self.model.parameters(), lr=custom_training_config['lr'])
         
-        if custom_training_config['amazon_mask']:
-            if custom_training_config['pixel_size'] == '25K':
-                mask = load_tif_image('data/IBAMA_INPE/25K/INPE/tiff/mask.tif')
-            elif custom_training_config['pixel_size'] == '1K':
-                pass
-            # mask = None
-            self.loss = WMSELoss(weight=1)
-            self.mae = WMAELoss(weight=1)
-        else:
-            self.loss = nn.MSELoss()
-            self.mae = nn.L1Loss()
-            # mask = None
+        if custom_training_config['amazon_mask'] and custom_training_config['pixel_size'] == '25K':
+            mask = load_tif_image('data/IBAMA_INPE/25K/INPE/tiff/mask.tif')
+            
+        # self.loss = WMSELoss(weight=1)
+        # self.mae = WMAELoss(weight=1)
         
         self.trainloader = trainloader
         self.valloader = valloader
         
-    def _build_model(self, in_shape, nclasses, custom_model_config):
-        return SimVP_Model(in_shape=in_shape, nclasses=nclasses, **custom_model_config).to(self.device)
+    def _build_model(self, in_shape, num_classes, custom_model_config):
+        return SimVP_Model(in_shape=in_shape, nclasses=num_classes, **custom_model_config).to(self.device)
     
     def _save_json(self, data, filename):
         with open(os.path.join(self.work_dir_path, filename), 'w') as f:
@@ -74,8 +80,12 @@ class BaseExperiment():
             y_pred = self.model(inputs.to(self.device))
             # Get only the first temporal channel
             y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
+            y_pred = torch.transpose(y_pred, 1, 2)
+            labels = labels.type(torch.LongTensor)
             
-            loss = self.loss(y_pred, labels.to(self.device))
+            # print(y_pred.shape, labels.shape, labels.squeeze(2).shape)
+            # print(y_pred.dtype, labels.squeeze(2).dtype)
+            loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
             loss.backward()
             
             # Adjust learning weights
@@ -96,11 +106,14 @@ class BaseExperiment():
                 y_pred = self.model(inputs.to(self.device))
                 # Get only the first temporal channel
                 y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
-                loss = self.loss(y_pred, labels.to(self.device))
-                mae = self.mae(y_pred, labels.to(self.device))
+                y_pred = torch.transpose(y_pred, 1, 2)
+                labels = labels.type(torch.LongTensor)
+                
+                loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
+                # mae = self.mae(y_pred, labels.to(self.device))
                 
                 val_loss += loss.detach()
-                val_mae += mae.detach()
+                # val_mae += mae.detach()
             
         val_loss = val_loss / len(self.valloader)
         val_mae = val_mae / len(self.valloader)

@@ -89,7 +89,8 @@ custom_training_config = {
     'amazon_mask': True,
     'pixel_size': pixel_size,
     'patch_size': patch_size,
-    'overlap': overlap
+    'overlap': overlap,
+    'loss': 'focal'
 }
 
 custom_model_config = {
@@ -104,7 +105,9 @@ custom_model_config = {
     'N_S': 2,
     'N_T': 2,
     'hid_S': 32, # default: 64
-    'hid_T': 128 # default: 256
+    'hid_T': 128, # default: 256,
+    'classification': True,
+    'num_classes': 2
 }
 
 exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
