@@ -482,7 +482,7 @@ class IbamaDETER1km_Dataset(Dataset):
             print(f'Training shape: {self.data_files.shape}')
             
             # Only using min_def != 0 to speed training. Validation should not use this
-            self.val_files, self.mask_val_files = divide_pred_windows(val_patches, min_def=0.02, window_size=window_size,\
+            self.val_files, self.mask_val_files = divide_pred_windows(val_patches, min_def=min_def, window_size=window_size,\
                 mask_patches=mask_val_patches)
             print(f'Validation shape: {self.val_files.shape}')
             

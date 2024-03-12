@@ -80,10 +80,18 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6,
             for j in range(patch.shape[0] - window_size + 1):
                 windowed_patch = patch[j:j+window_size]
                 label = windowed_patch[-pred_horizon:]
-                if np.mean(label > 0, axis=(0, 1, 2)) < min_def:
+                # print(label.shape)
+                _label = label[:, mask_patches[i] == 1]
+                mean = np.mean(_label, axis=(0, 1))
+                # Deal with Nan
+                if np.isnan(mean): mean = 0
+                if mean < min_def:
                     skipped_count += 1
                     pbar.update(1)
                     continue
+                # print(np.mean(mask_patches[i], axis=(0, 1)))
+                # print(label.shape, _label.shape)
+                # print(np.mean(_label, axis=(0, 1)))
                 # indexes.append((i, j, j+window_size))
                 windowed_patches.append(windowed_patch)
                 if mask_patches is not None:

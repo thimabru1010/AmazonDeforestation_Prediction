@@ -6,13 +6,12 @@ import torch.nn as nn
 import torch.optim as optm
 import os
 import json
-from metrics import confusion_matrix, f1_score
+from metrics_amazon import CM, f1_score0, f1_score1, Recall, Precision, ACC
 import numpy as np
 import torch.nn.functional as F
 from torchsummary import summary
 from preprocess import load_tif_image, preprocess_patches, divide_pred_windows, reconstruct_sorted_patches, reconstruct_time_patches
 
-from sklearn.metrics import f1_score as skf1_score
 from CustomLosses import WMSELoss, WMAELoss
 
 class BaseExperiment():
@@ -36,14 +35,26 @@ class BaseExperiment():
         torch.manual_seed(seed)
         self.model = self._build_model(in_shape, custom_model_config['num_classes'], custom_model_config)
         
+        self.aux_metrics = {}
         if custom_model_config['num_classes']:
             self.classification = True
             if custom_training_config['loss'] == 'focal':
-                self.loss = FocalLoss(mode='multiclass', alpha=0.25, gamma=4.0, ignore_index=-1)
+                self.loss = FocalLoss(mode='multiclass', gamma=4.0, ignore_index=-1)
             elif custom_training_config['loss'] == 'ce':
                 class_weights = torch.tensor([1, 1], dtype=torch.float32).to(self.device)
                 self.loss = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
             #TODO: add auxiliary metrics
+            for metric in custom_training_config['aux_metrics']:
+                if metric == 'f1_score0':
+                    self.aux_metrics['f1_score0'] = f1_score0
+                elif metric == 'f1_score1':
+                    self.aux_metrics['f1_score1'] = f1_score1
+                elif metric == 'Recall':
+                    self.aux_metrics['Recall'] = Recall
+                elif metric == 'Precision':
+                    self.aux_metrics['Precision'] = Precision
+                elif metric == 'CM':
+                    self.aux_metrics['CM'] = CM
         else:
             self.classification = False
             self.loss = WMSELoss(weight=1)
@@ -54,8 +65,8 @@ class BaseExperiment():
         
         self.optm = optm.Adam(self.model.parameters(), lr=custom_training_config['lr'])
         
-        if custom_training_config['amazon_mask'] and custom_training_config['pixel_size'] == '25K':
-            mask = load_tif_image('data/IBAMA_INPE/25K/INPE/tiff/mask.tif')
+        # if custom_training_config['amazon_mask'] and custom_training_config['pixel_size'] == '25K':
+        #     mask = load_tif_image('data/IBAMA_INPE/25K/INPE/tiff/mask.tif')
             
         # self.loss = WMSELoss(weight=1)
         # self.mae = WMAELoss(weight=1)
@@ -99,6 +110,7 @@ class BaseExperiment():
     def validate_one_epoch(self):
         val_loss = 0
         val_mae = 0
+        val_aux_metrics = dict.fromkeys(self.aux_metrics.keys(), 0)
         self.model.eval()
         # Disable gradient computation and reduce memory consumption.
         with torch.no_grad():
@@ -111,14 +123,25 @@ class BaseExperiment():
                 
                 loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
                 # mae = self.mae(y_pred, labels.to(self.device))
+                y_pred = F.softmax(y_pred, dim=1)
+                y_pred = torch.argmax(y_pred, dim=1)
+                labels = labels.squeeze(2)
+                # print(y_pred.shape, labels.shape)
+                y_pred = y_pred[labels != -1].cpu().numpy()
+                labels = labels[labels != -1].cpu().numpy()
+                for metric_name in self.aux_metrics.keys():
+                    
+                    val_aux_metrics[metric_name] += self.aux_metrics[metric_name](y_pred, labels)
                 
                 val_loss += loss.detach()
                 # val_mae += mae.detach()
             
         val_loss = val_loss / len(self.valloader)
         val_mae = val_mae / len(self.valloader)
+        for metric_name in self.aux_metrics.keys():
+            val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / len(self.valloader)
         
-        return val_loss, val_mae
+        return val_loss, val_mae, val_aux_metrics
     
     def train(self):
         min_val_loss = float('inf')
@@ -127,7 +150,7 @@ class BaseExperiment():
             
             train_loss = self.train_one_epoch()
             
-            val_loss, val_mae = self.validate_one_epoch()
+            val_loss, val_mae, val_aux_metrics = self.validate_one_epoch()
             
             if val_loss + self.delta < min_val_loss:
                 min_val_loss = val_loss
@@ -140,8 +163,14 @@ class BaseExperiment():
             if early_stop_counter >= self.patience:
                 print(f'Early Stopping! Early Stopping counter: {early_stop_counter}')
                 break
-            
-            print(f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f} | Validation MAE = {val_mae:.6f}")
+            terminal_str = f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}"
+            for metric_name in val_aux_metrics.keys():
+                if metric_name != 'CM':
+                    terminal_str += f" | Validation {metric_name} = {val_aux_metrics[metric_name]:.6f}"
+            print(terminal_str)
+            print(val_aux_metrics['CM'])
+            # print(f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}")
+            # print(f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f} | Validation MAE = {val_mae:.6f}")
 
 def _build_model(in_shape, nclasses, custom_model_config, device):
     return SimVP_Model(in_shape=in_shape, nclasses=nclasses, **custom_model_config).to(device)

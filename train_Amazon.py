@@ -28,9 +28,9 @@ Debug = False
 pixel_size = '1K'
 
 patch_size = 64
-overlap = 0.1
+overlap = 0.15
 window_size = 6
-min_def = 0.02
+min_def = 0.0005
 
 root_dir = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE/{pixel_size}')
 print(root_dir)
@@ -39,6 +39,7 @@ prob = 0.5
 copy_fn = lambda x, **kwargs: x.copy()
 transform = A.Compose(
     [
+        # TODO: Make Random Rotate work
         # A.RandomRotate90(p=prob),
         A.OneOf([A.HorizontalFlip(p=prob), A.VerticalFlip(p=prob)]),
         A.Lambda(image=copy_fn, mask=copy_fn),
@@ -90,7 +91,8 @@ custom_training_config = {
     'pixel_size': pixel_size,
     'patch_size': patch_size,
     'overlap': overlap,
-    'loss': 'focal'
+    'loss': 'focal',
+    'aux_metrics': ['f1_score0', 'f1_score1', 'CM'],
 }
 
 custom_model_config = {

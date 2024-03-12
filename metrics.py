@@ -14,9 +14,7 @@ def confusion_matrix(true, pred, num_classes=2):
     TN = confusion_matrix[1, 1]
     return confusion_matrix, TP, FP, FN, TN
 
-def f1_score(pred, true, test_time=False):
-    # _pred = (pred >= 0.5).reshape(-1)
-    # _true = true.reshape(-1)
+def f1_score(pred, true):
     prec = Precision(pred, true)
     rec = Recall(pred, true)
     f1_clss0 = 2 * prec * rec / (prec + rec)
@@ -26,6 +24,7 @@ def f1_score(pred, true, test_time=False):
     
     prec = TN/(TN+FN)
     rec = TN/(TN+FP)
+    
     f1_clss1 = 2 * prec * rec / (prec + rec)
     if np.isnan(f1_clss1):
         f1_clss1 = np.array([0])
