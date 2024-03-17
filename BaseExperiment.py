@@ -118,6 +118,7 @@ class BaseExperiment():
                 y_pred = self.model(inputs.to(self.device))
                 # Get only the first temporal channel
                 y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
+                # Change B, T, C to B, C, T
                 y_pred = torch.transpose(y_pred, 1, 2)
                 labels = labels.type(torch.LongTensor)
                 
@@ -179,94 +180,152 @@ def test_model(testloader, custom_training_config, custom_model_config):
     work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
     device = "cuda:0"
     in_shape = custom_training_config['in_shape']
-        
-    model = _build_model(in_shape, None, custom_model_config, device)
+    
+    model = _build_model(in_shape, custom_model_config['num_classes'], custom_model_config, device)
+    # model = _build_model(in_shape, None, custom_model_config, device)
     model.load_state_dict(torch.load(os.path.join(work_dir_path, 'checkpoint.pth')))
     # model.load_state_dict(os.path.join(work_dir_path, 'checkpoint.pth')).to(device)
     model.eval()
     
-    # mse = nn.MSELoss()
-    mse = WMSELoss(weight=1)
-    mae = WMAELoss(weight=1)
-    # mae = nn.L1Loss()
-    
-    test_loss = 0.0
-    test_mae = 0.0
+    aux_metrics = {}
+    if custom_model_config['num_classes']:
+        classification = True
+        #TODO: add auxiliary metrics
+        for metric in custom_training_config['aux_metrics']:
+            if metric == 'f1_score0':
+                aux_metrics['f1_score0'] = f1_score0
+            elif metric == 'f1_score1':
+                aux_metrics['f1_score1'] = f1_score1
+            elif metric == 'Recall':
+                aux_metrics['Recall'] = Recall
+            elif metric == 'Precision':
+                aux_metrics['Precision'] = Precision
+            elif metric == 'CM':
+                aux_metrics['CM'] = CM
+    else:
+        classification = False
+        mse = WMSELoss(weight=1)
+        # TODO: add auxiliary metrics
+        mae = WMAELoss(weight=1)
+        test_loss = 0.0
+        test_mae = 0.0
+        
     # cm = np.zeros((2, 2), dtype=int)
     # Disable gradient computation and reduce memory consumption.
     skip_cont = 0
     preds = []
+    preds_def = []
+    val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
     with torch.no_grad():
         for inputs, labels in tqdm(testloader):
-            # Check if all pixels are -1
-            # if torch.all(labels == -1):
-            #     skip_cont += 1
-            #     continue
             y_pred = model(inputs.to(device))
             # Get only the first temporal channel
-            y_pred = y_pred[:, :2].contiguous().unsqueeze(1)
+            y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
+            # Change B, T, C to B, C, T
+            y_pred = torch.transpose(y_pred, 1, 2)
+            labels = labels.type(torch.LongTensor)
             
-            if torch.all(labels == -1):
-                skip_cont += 1
-                # continue
+            # if torch.all(labels == -1):
+            #     skip_cont += 1
+            #     # continue
+            
+            if classification:    
+                # print(y_pred.shape, labels.shape)
+                y_pred = y_pred.cpu()
+                labels = labels.cpu()
+                
+                y_pred = F.softmax(y_pred, dim=1)
+                print(y_pred.shape)
+                preds.append(y_pred[0].numpy())
+                # preds_def.append(y_pred[0, 1].numpy())
+                
+                y_pred = torch.argmax(y_pred, dim=1).squeeze(1)
+                labels = labels.squeeze(2)
+
+                # preds.append(y_pred[0].numpy())
+                
+                # If all labels are outside the mask, don't calculate the error
+                # But they are inferred by the model and appended to the list due to reconstruction
+                if torch.all(labels == -1):
+                    skip_cont += 1
+                    continue
+                
+                y_pred = y_pred[labels != -1].numpy()
+                labels = labels[labels != -1].numpy()
+                
+                for metric_name in aux_metrics.keys():
+                    val_aux_metrics[metric_name] += aux_metrics[metric_name](y_pred, labels)
+                
+            else:
+                preds.append(y_pred.cpu().numpy()[0, 0, 0])  
+                
+                if torch.all(labels == -1):
+                    skip_cont += 1
+                    continue
+                
                 loss = mse(y_pred, labels.to(device))
                 _mae = mae(y_pred, labels.to(device))
                     
                 test_loss += loss.detach()
                 test_mae += _mae.detach()
             
-            # print(y_pred.cpu().numpy()[0, 0, 0].shape)
-            preds.append(y_pred.cpu().numpy()[0, 0, 0])  
-
-        test_loss = test_loss / (len(testloader) - skip_cont)
-        test_mae = test_mae / (len(testloader) - skip_cont)
-    
-    print("======== Metrics ========")
-    print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')
-    preds = np.stack(preds, axis=0)
-    print(preds.shape)
-    
-    # 44 = 46 - 2
-    # div_time = preds.shape[0] // 44
-    # patches = []
-    # for i in range(0, div_time):
-    #     windowed_patch = preds[i * 44: (i + 1) * 44]
-    #     print(windowed_patch.shape)
-    #     patches.append(windowed_patch)
-    #     # print(patches.shape)
-    # patches = np.stack(patches, axis=0)
-    # print(patches.shape)
-    
-    # images_reconstructed = []
-    # for i in range(patches.shape[1]):
-    #     print(patches[i].shape)
-    #     img_reconstructed = reconstruct_sorted_patches(patches[:, i], (2333, 3005), patch_size=64)
-    #     print(img_reconstructed.shape)
-    #     images_reconstructed.append(img_reconstructed)
-        
-    # np.save('reconstructed_images.npy', np.stack(images_reconstructed, axis=0))
-    _ = reconstruct_time_patches(preds, patch_size=64, time_idx=44, original_img_shape=(2333, 3005))
-    
-    #! Baseline test
-    # Check if the model outputed zero por all pixels
-    test_loss = 0.0
-    test_mae = 0.0
-    # Disable gradient computation and reduce memory consumption.
-    for inputs, labels in tqdm(testloader):
-        # y_pred = model(inputs.to(device))
-        if torch.all(labels == -1):
-            skip_cont += 1
-            continue
-        y_pred = torch.zeros_like(labels)
-        
-        loss = mse(y_pred, labels)
-        _mae = mae(y_pred, labels)
+                # print(y_pred.cpu().numpy()[0, 0, 0].shape)
+                # preds.append(y_pred.cpu().numpy()[0, 0, 0])
             
-        test_loss += loss.detach()
-        test_mae += _mae.detach()
 
-    test_loss = test_loss / (len(testloader) - skip_cont)
-    test_mae = test_mae / (len(testloader) - skip_cont)
+        preds = np.stack(preds, axis=0)
+        print(preds.shape)
+        np.save(os.path.join(work_dir_path, 'preds.npy'), preds)
+        # preds_def = np.stack(preds_def, axis=0)
+        # print(preds_def.shape)
+        print("======== Test Metrics ========")
+        if classification:
+            for metric_name in aux_metrics.keys():
+                val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
+            terminal_str = f""
+            for metric_name in val_aux_metrics.keys():
+                if metric_name != 'CM':
+                    terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
+            print(terminal_str)
+            print(val_aux_metrics['CM'])
+        else:
+            test_loss = test_loss / (len(testloader) - skip_cont)
+            test_mae = test_mae / (len(testloader) - skip_cont)
+            
+            print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')
+            # preds = np.stack(preds, axis=0)
+            # print(preds.shape)
+    return preds
     
-    print("======== Zero Pred Baseline Metrics ========")
-    print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')
+    # preds_reconstructed = reconstruct_time_patches(preds, patch_size=64, time_idx=44, original_img_shape=(2333, 3005))
+    # np.save('data/reconstructed_images.npy', preds_reconstructed)
+    # del preds_reconstructed
+    
+    # def_preds_reconstructed = reconstruct_time_patches(preds_def, patch_size=64, time_idx=44, original_img_shape=(2333, 3005))
+    # np.save('data/def_reconstructed_images.npy', def_preds_reconstructed)
+    # del def_preds_reconstructed
+    
+    # TODO: Adapt Baseline Test to classification
+    #! Baseline test
+    # # Check if the model outputed zero por all pixels
+    # test_loss = 0.0
+    # test_mae = 0.0
+    # # Disable gradient computation and reduce memory consumption.
+    # for inputs, labels in tqdm(testloader):
+    #     # y_pred = model(inputs.to(device))
+    #     if torch.all(labels == -1):
+    #         skip_cont += 1
+    #         continue
+    #     y_pred = torch.zeros_like(labels)
+        
+    #     loss = mse(y_pred, labels)
+    #     _mae = mae(y_pred, labels)
+            
+    #     test_loss += loss.detach()
+    #     test_mae += _mae.detach()
+
+    # test_loss = test_loss / (len(testloader) - skip_cont)
+    # test_mae = test_mae / (len(testloader) - skip_cont)
+    
+    # print("======== Zero Pred Baseline Metrics ========")
+    # print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')

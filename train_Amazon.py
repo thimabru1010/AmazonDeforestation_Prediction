@@ -11,6 +11,8 @@ from albumentations.pytorch import ToTensorV2
 import pandas as pd
 import geopandas as gpd
 from BaseExperiment import BaseExperiment, test_model
+from preprocess import reconstruct_time_patches
+import os
 
 def load_tif_image(tif_path):
     gdal_header = gdal.Open(str(tif_path))
@@ -112,9 +114,9 @@ custom_model_config = {
     'num_classes': 2
 }
 
-exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
+# exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
 
-exp.train()
+# exp.train()
 
 #TODO: pass test patches to the experiment
 if pixel_size == '25K':
@@ -122,10 +124,31 @@ if pixel_size == '25K':
     test_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data, means=[train_set.mean, train_set.mean_for, train_set.mean_clouds], stds=[train_set.std, train_set.std_for, train_set.std_clouds])
 elif pixel_size == '1K':
     test_data, mask_test_data = train_set.get_test_set()
+    print(len(test_data), len(mask_test_data))
+    print(test_data.shape, mask_test_data.shape)
     test_set = IbamaDETER1km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data,\
         mask_val_data=mask_test_data, means=[train_set.mean], stds=[train_set.std])
 
 dataloader_test = torch.utils.data.DataLoader(
     test_set, batch_size=1, shuffle=False, pin_memory=True)
 
-test_model(dataloader_test, custom_training_config, custom_model_config)
+# preds = test_model(dataloader_test, custom_training_config, custom_model_config)
+preds = np.load('work_dirs/custom_exp10/preds.npy')
+
+work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
+print('Reconstructing patches....')
+print(preds.shape)
+preds_clssf = np.argmax(preds, axis=1)[:, 0]
+print(preds_clssf.shape)
+preds_reconstructed = reconstruct_time_patches(preds_clssf, patch_size=64, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
+print('Preds reconstructed')
+np.save(os.path.join(work_dir_path, 'reconstructed_images.npy'), preds_reconstructed)
+del preds_reconstructed
+
+print('Reconstructing def preds....')
+preds_def = preds[:, 1, 0]
+
+def_preds_reconstructed = reconstruct_time_patches(preds_def, patch_size=64, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
+print('Def Preds reconstructed')
+np.save(os.path.join(work_dir_path, 'def_reconstructed_images.npy'), def_preds_reconstructed)
+del def_preds_reconstructed

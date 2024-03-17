@@ -23,6 +23,15 @@ def extract_patches(image: np.ndarray, patch_size: int, stride: int) -> np.ndarr
         print(image.shape)
         return np.array(view_as_windows(image, window_shape_array, step=stride)).reshape((-1,) + window_shape_array)
 
+def extract_temporal_sorted_patches(deter_img, patch_size):
+    patches = []
+    for t in range(deter_img.shape[0]):
+        img = deter_img[t]
+        patches_t = extract_sorted_patches(img, patch_size=patch_size)
+        patches.append(patches_t)
+
+    return np.stack(patches, axis=0)
+
 def extract_sorted_patches(img, patch_size):
     patches = []
     for i in range(0, img.shape[0] - patch_size + 1, patch_size):
@@ -44,26 +53,35 @@ def preprocess_patches(img: np.ndarray, patch_size: int, overlap: int):
     print('Extracting patches...')
     stride = int((1-overlap)*patch_size)
     patches = extract_patches(img, patch_size=patch_size, stride=stride)
-    print(f'Patches extracted: {patches.shape}')
+    # print(f'Patches extracted: {patches.shape}')
     return patches
 
-def reconstruct_time_patches(preds: np.ndarray, patch_size: int=64, time_idx: int=44, original_img_shape: tuple=(2333, 3005)):
+def reconstruct_time_patches(preds: np.ndarray, patch_size: int=64, time_idx: int=43, original_img_shape: tuple=(2333, 3005), len_patches: int=1):
     #! OBS: 44 = 46 - 2
     # 46 é o número de quinzenas em grupos de 3. 2 são as duas quinzenas iniciais usadas para a primeira previsão.
+    time_idx = preds.shape[0] // len_patches
+    print('Time idx:', time_idx)
     div_time = preds.shape[0] // time_idx
+    print('Div time:', div_time)
     patches = []
     for i in range(div_time):
         windowed_patch = preds[i * time_idx: (i + 1) * time_idx]
-        patches.append(windowed_patch)
+        # print(windowed_patch.shape)
+        init_patches = windowed_patch[0]
+        non_duplicated = windowed_patch[1:, -1]
+        patches_t = np.concatenate((init_patches, non_duplicated), axis=0)
+        patches.append(patches_t)
         # print(patches.shape)
     patches = np.stack(patches, axis=0)
+    print('Grouped patches shape:', patches.shape)
     
     images_reconstructed = []
     for i in range(patches.shape[1]):
+        # print(patches.shape)
         img_reconstructed = reconstruct_sorted_patches(patches[:, i], original_img_shape, patch_size=patch_size)
         images_reconstructed.append(img_reconstructed)
         
-    np.save('data/reconstructed_images.npy', np.stack(images_reconstructed, axis=0))
+    # np.save('data/reconstructed_images.npy', np.stack(images_reconstructed, axis=0))
     return np.stack(images_reconstructed, axis=0)
 
 def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6, pred_horizon: int=2, mask_patches: np.ndarray=None) -> np.ndarray:
@@ -71,7 +89,7 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6,
     # if mask_patches is not None:
     windowed_mask_patches = []
     windowed_patches = []
-    # indexes = []
+    indexes = []
     total_iterations = patches.shape[0] * (patches.shape[1] - window_size + 1)
     with tqdm(total=total_iterations, desc='Dividing in prediction windows') as pbar:
         # Loop trough patches
@@ -86,13 +104,14 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6,
                 # Deal with Nan
                 if np.isnan(mean): mean = 0
                 if mean < min_def:
+                    # print('entered if')
                     skipped_count += 1
                     pbar.update(1)
                     continue
                 # print(np.mean(mask_patches[i], axis=(0, 1)))
                 # print(label.shape, _label.shape)
                 # print(np.mean(_label, axis=(0, 1)))
-                # indexes.append((i, j, j+window_size))
+                indexes.append((i, j, j+window_size))
                 windowed_patches.append(windowed_patch)
                 if mask_patches is not None:
                     windowed_mask_patches.append(mask_patches[i])
@@ -102,7 +121,7 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6,
         windowed_mask_patches = np.concatenate(windowed_mask_patches, axis=0).reshape((-1,) + mask_patches.shape[1:])
     else:
         windowed_mask_patches = None
-    return np.concatenate(windowed_patches, axis=0).reshape((-1, window_size) + patches.shape[2:]), windowed_mask_patches#, indexes
+    return np.concatenate(windowed_patches, axis=0).reshape((-1, window_size) + patches.shape[2:]), windowed_mask_patches, indexes
 
 
 def save_patches(patches: np.ndarray, modality: str, save_path: pathlib.Path, window_size: int=5):

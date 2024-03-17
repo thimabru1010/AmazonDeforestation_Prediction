@@ -6,7 +6,7 @@ import os
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from preprocess import load_tif_image, preprocess_patches, divide_pred_windows
+from preprocess import load_tif_image, preprocess_patches, divide_pred_windows, extract_sorted_patches, extract_temporal_sorted_patches
 from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -462,33 +462,39 @@ class IbamaDETER1km_Dataset(Dataset):
             self.std = deter_img_train.std()
             
             train_patches = preprocess_patches(deter_img_train, patch_size=patch_size, overlap=overlap)
+            print('Train Patches:', train_patches.shape)
             del deter_img_train
             val_patches = preprocess_patches(deter_img_val, patch_size=patch_size, overlap=0)
+            print('Validation Patches:', val_patches.shape)
             del deter_img_val
-            test_patches = preprocess_patches(deter_img_test, patch_size=patch_size, overlap=0)
+            # test_patches = preprocess_patches(deter_img_test, patch_size=patch_size, overlap=0)
+            test_patches = extract_temporal_sorted_patches(deter_img_test, patch_size)
+            print('Test Patches:', test_patches.shape)
             del deter_img_test
             
             mask_train_patches = preprocess_patches(mask, patch_size=patch_size, overlap=overlap)
-            
+            print('Mask Train Patches:', mask_train_patches.shape)
             mask_val_patches = preprocess_patches(mask, patch_size=patch_size, overlap=0)
-            
-            mask_test_patches = preprocess_patches(mask, patch_size=patch_size, overlap=0)
+            print('Mask Validation Patches:', mask_val_patches.shape)
+            # mask_test_patches = preprocess_patches(mask, patch_size=patch_size, overlap=0)
+            mask_test_patches = extract_sorted_patches(mask, patch_size)
+            print('Mask Test Patches:', mask_test_patches.shape)
             
             
             # self.data_files = train_patches
             # self.val_files = val_patches
-            self.data_files, self.mask_files = divide_pred_windows(train_patches, min_def=min_def, window_size=window_size,\
+            self.data_files, self.mask_files, _ = divide_pred_windows(train_patches, min_def=min_def, window_size=window_size,\
                 mask_patches=mask_train_patches)
             print(f'Training shape: {self.data_files.shape}')
             
             # Only using min_def != 0 to speed training. Validation should not use this
-            self.val_files, self.mask_val_files = divide_pred_windows(val_patches, min_def=min_def, window_size=window_size,\
+            self.val_files, self.mask_val_files, _ = divide_pred_windows(val_patches, min_def=min_def, window_size=window_size,\
                 mask_patches=mask_val_patches)
             print(f'Validation shape: {self.val_files.shape}')
             
-            self.test_files, self.mask_test_files = divide_pred_windows(test_patches, min_def=0, window_size=window_size,\
+            self.test_files, self.mask_test_files, _ = divide_pred_windows(test_patches, min_def=0, window_size=window_size,\
                 mask_patches=mask_test_patches)
-            print(f'Test shape: {self.val_files.shape}')
+            print(f'Test shape: {self.test_files.shape}')
             
             
         else:
@@ -503,30 +509,11 @@ class IbamaDETER1km_Dataset(Dataset):
         self.normalize = normalize
         self.transform = transform
     
-    def normalize_non_temporal(self, data, cut=None):
-        '''Normalize the non-temporal channels'''
-        data[data < -1e38] = -1
-        _data = data[data != -1]
-        mean = _data.mean(axis=0)
-        std = _data.std(axis=0)
-        print('Mean:', mean, 'Std:', std)
-        data = (data - mean) / std
-        if cut is not None:
-            data = data[:cut[0], :cut[1]]
-        return data
-    
     def get_validation_set(self):
         return self.val_files, self.mask_val_files
     
     def get_test_set(self):
         return self.test_files, self.mask_test_files
-    
-    def sliding_window(self, input_list, window_size):
-        result = []
-        for i in range(len(input_list) - window_size + 1):
-            window = input_list[i:i + window_size]
-            result.append(window)
-        return result
     
     def __len__(self):
         return len(self.data_files)
