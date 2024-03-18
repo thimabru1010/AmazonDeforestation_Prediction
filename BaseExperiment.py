@@ -39,7 +39,7 @@ class BaseExperiment():
         if custom_model_config['num_classes']:
             self.classification = True
             if custom_training_config['loss'] == 'focal':
-                self.loss = FocalLoss(mode='multiclass', gamma=4.0, ignore_index=-1)
+                self.loss = FocalLoss(mode='multiclass', gamma=3.5, ignore_index=-1)
             elif custom_training_config['loss'] == 'ce':
                 class_weights = torch.tensor([1, 1], dtype=torch.float32).to(self.device)
                 self.loss = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
@@ -235,7 +235,7 @@ def test_model(testloader, custom_training_config, custom_model_config):
                 labels = labels.cpu()
                 
                 y_pred = F.softmax(y_pred, dim=1)
-                print(y_pred.shape)
+                # print(y_pred.shape)
                 preds.append(y_pred[0].numpy())
                 # preds_def.append(y_pred[0, 1].numpy())
                 

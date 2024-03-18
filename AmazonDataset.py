@@ -485,16 +485,16 @@ class IbamaDETER1km_Dataset(Dataset):
             # self.val_files = val_patches
             self.data_files, self.mask_files, _ = divide_pred_windows(train_patches, min_def=min_def, window_size=window_size,\
                 mask_patches=mask_train_patches)
-            print(f'Training shape: {self.data_files.shape}')
+            print(f'Training shape: {self.data_files.shape} - {self.mask_files.shape}')
             
             # Only using min_def != 0 to speed training. Validation should not use this
             self.val_files, self.mask_val_files, _ = divide_pred_windows(val_patches, min_def=min_def, window_size=window_size,\
                 mask_patches=mask_val_patches)
-            print(f'Validation shape: {self.val_files.shape}')
+            print(f'Validation shape: {self.val_files.shape} - {self.mask_val_files.shape}')
             
             self.test_files, self.mask_test_files, _ = divide_pred_windows(test_patches, min_def=0, window_size=window_size,\
                 mask_patches=mask_test_patches)
-            print(f'Test shape: {self.test_files.shape}')
+            print(f'Test shape: {self.test_files.shape} - {self.mask_test_files.shape}')
             
             
         else:
@@ -529,10 +529,11 @@ class IbamaDETER1km_Dataset(Dataset):
         
         # Apply Legal Amazon Mask
         # No negative values should be present in input data
-        data[:, mask == 0] = -1
+        data[:, mask == 0] = 0
         # data[data == -1] = 0
         # Negative values will be filtered in the cost function
         labels[:, mask == 0] = -1
+        labels[labels > 0] = 1
         
         # print(data.shape, labels.shape)
         # print(self.mean.shape, self.std.shape)

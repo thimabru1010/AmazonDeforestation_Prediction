@@ -33,6 +33,7 @@ patch_size = 64
 overlap = 0.15
 window_size = 6
 min_def = 0.0005
+normalize = True
 
 root_dir = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE/{pixel_size}')
 print(root_dir)
@@ -42,7 +43,7 @@ copy_fn = lambda x, **kwargs: x.copy()
 transform = A.Compose(
     [
         # TODO: Make Random Rotate work
-        # A.RandomRotate90(p=prob),
+        #A.RandomRotate90(p=prob),
         A.OneOf([A.HorizontalFlip(p=prob), A.VerticalFlip(p=prob)]),
         A.Lambda(image=copy_fn, mask=copy_fn),
         ToTensorV2()
@@ -57,10 +58,10 @@ if pixel_size == '25K':
     width = 136
     height = 98
 elif pixel_size == '1K':
-    train_set = IbamaDETER1km_Dataset(root_dir=root_dir, Debug=Debug, transform=transform,\
+    train_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalize=normalize, Debug=Debug, transform=transform,\
         patch_size=patch_size, overlap=overlap, min_def=min_def, window_size=window_size)
     val_data, mask_val_data = train_set.get_validation_set()
-    val_set = IbamaDETER1km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', patch_size=patch_size,\
+    val_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalize=normalize, Debug=Debug, mode='val', patch_size=patch_size,\
         val_data=val_data, mask_val_data=mask_val_data, means=[train_set.mean], stds=[train_set.std])
     width = patch_size
     height = patch_size
@@ -84,7 +85,7 @@ custom_training_config = {
     # 'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score', 'CM'],
     'metrics': ['mse', 'mae'],
 
-    'ex_name': 'custom_exp10', # custom_exp
+    'ex_name': 'custom_exp2', # custom_exp
     'dataname': 'custom',
     'in_shape': [4, 1, height, width], # T, C, H, W = self.args.in_shape
     'patience': 10,
@@ -95,6 +96,7 @@ custom_training_config = {
     'overlap': overlap,
     'loss': 'focal',
     'aux_metrics': ['f1_score0', 'f1_score1', 'CM'],
+    'normalize': normalize
 }
 
 custom_model_config = {
@@ -106,17 +108,17 @@ custom_model_config = {
     
     # Here, we directly set these parameters
     'model_type': 'gSTA',
-    'N_S': 2,
-    'N_T': 2,
+    'N_S': 3,
+    'N_T': 3,
     'hid_S': 32, # default: 64
     'hid_T': 128, # default: 256,
     'classification': True,
     'num_classes': 2
 }
 
-# exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
+exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
 
-# exp.train()
+exp.train()
 
 #TODO: pass test patches to the experiment
 if pixel_size == '25K':
@@ -132,23 +134,23 @@ elif pixel_size == '1K':
 dataloader_test = torch.utils.data.DataLoader(
     test_set, batch_size=1, shuffle=False, pin_memory=True)
 
-# preds = test_model(dataloader_test, custom_training_config, custom_model_config)
-preds = np.load('work_dirs/custom_exp10/preds.npy')
+preds = test_model(dataloader_test, custom_training_config, custom_model_config)
+# preds = np.load('work_dirs/custom_exp1/preds.npy')
 
 work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
 print('Reconstructing patches....')
 print(preds.shape)
-preds_clssf = np.argmax(preds, axis=1)[:, 0]
+preds_clssf = np.argmax(preds, axis=1)
 print(preds_clssf.shape)
 preds_reconstructed = reconstruct_time_patches(preds_clssf, patch_size=64, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
 print('Preds reconstructed')
-np.save(os.path.join(work_dir_path, 'reconstructed_images.npy'), preds_reconstructed)
+np.save(os.path.join(work_dir_path, 'preds_reconstructed.npy'), preds_reconstructed)
 del preds_reconstructed
 
 print('Reconstructing def preds....')
-preds_def = preds[:, 1, 0]
+preds_def = preds[:, 1]
 
 def_preds_reconstructed = reconstruct_time_patches(preds_def, patch_size=64, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
 print('Def Preds reconstructed')
-np.save(os.path.join(work_dir_path, 'def_reconstructed_images.npy'), def_preds_reconstructed)
+np.save(os.path.join(work_dir_path, 'def_preds_reconstructed.npy'), def_preds_reconstructed)
 del def_preds_reconstructed
