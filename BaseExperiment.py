@@ -316,7 +316,7 @@ def test_model(testloader, training_config, custom_model_config):
         
         for metric_name in aux_metrics.keys():
             val_aux_metrics[metric_name] += aux_metrics[metric_name](labels, labels)
-    
+    print('Skip cont:', skip_cont)
     print("======== Classification Baseline Metrics ========")
     for metric_name in aux_metrics.keys():
         val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
@@ -324,8 +324,8 @@ def test_model(testloader, training_config, custom_model_config):
         for metric_name in val_aux_metrics.keys():
             if metric_name != 'CM':
                 terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
-        print(terminal_str)
-        print(val_aux_metrics['CM'])
+    print(terminal_str)
+    print(val_aux_metrics['CM'])
     return preds
     
     # TODO: Adapt Baseline Test to classification
