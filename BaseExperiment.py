@@ -301,7 +301,8 @@ def test_model(testloader, training_config, custom_model_config):
         print("======== Test Metrics ========")
         if classification:
             for metric_name in aux_metrics.keys():
-                val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
+                if metric_name != 'CM':
+                    val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
             cm = val_aux_metrics['CM']
             TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]
             prec = TP/(TP+FP)
