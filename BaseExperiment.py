@@ -304,34 +304,28 @@ def test_model(testloader, training_config, custom_model_config):
             # print(preds.shape)
             test_loss = 0.0
         
-        val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
-        for inputs, labels in tqdm(testloader):
-
-            if torch.all(labels == -1):
-                skip_cont += 1
-                continue
-            
-            # y_pred = y_pred[labels != -1].numpy()
-            labels = labels[labels != -1].numpy()
-            
-            for metric_name in aux_metrics.keys():
-                val_aux_metrics[metric_name] += aux_metrics[metric_name](labels, labels)
-                
-            # test_loss += loss.detach()
-            # test_mae += _mae.detach()
-
-        # test_loss = test_loss / (len(testloader) - skip_cont)
-        # test_mae = test_mae / (len(testloader) - skip_cont)
+    #! Classification Baseline Metrics
+    val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
+    for inputs, labels in tqdm(testloader):
+        if torch.all(labels == -1):
+            skip_cont += 1
+            continue
         
-        print("======== Classification Baseline Metrics ========")
+        # y_pred = y_pred[labels != -1].numpy()
+        labels = labels[labels != -1].numpy()
+        
         for metric_name in aux_metrics.keys():
-            val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
-            terminal_str = f""
-            for metric_name in val_aux_metrics.keys():
-                if metric_name != 'CM':
-                    terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
-            print(terminal_str)
-            print(val_aux_metrics['CM'])
+            val_aux_metrics[metric_name] += aux_metrics[metric_name](labels, labels)
+    
+    print("======== Classification Baseline Metrics ========")
+    for metric_name in aux_metrics.keys():
+        val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
+        terminal_str = f""
+        for metric_name in val_aux_metrics.keys():
+            if metric_name != 'CM':
+                terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
+        print(terminal_str)
+        print(val_aux_metrics['CM'])
     return preds
     
     # TODO: Adapt Baseline Test to classification
