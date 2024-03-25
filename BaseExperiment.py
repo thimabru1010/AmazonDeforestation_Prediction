@@ -327,6 +327,13 @@ def test_model(testloader, training_config, custom_model_config):
                 terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
     print(terminal_str)
     print(val_aux_metrics['CM'])
+    cm = val_aux_metrics['CM']
+    TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]
+    print(FP, FN)
+    prec = TN/(TN+FN)
+    rec = TN/(TN+FP)
+    f1_score1 = 2 * prec * rec / (prec + rec)
+    print(f'F1 Score Class 1: {f1_score1:.6f}')
     return preds
     
     # TODO: Adapt Baseline Test to classification
