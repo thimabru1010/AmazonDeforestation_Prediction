@@ -18,6 +18,7 @@ parser = argparse.ArgumentParser(description='Amazon Deforestation Prediction')
 parser.add_argument('--root_dir', type=str,\
     default='/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE', help='Root directory for the dataset')
 parser.add_argument('--batch_size', type=int, default=16, help='Batch size for the dataset')
+parser.add_argument('-lr', '--learning_rate', type=float, default=1e-3, help='Learning rate to be used in the training')
 parser.add_argument('--patch_size', type=int, default=128, help='Patch size for the dataset')
 parser.add_argument('--overlap', type=float, default=0.15, help='Overlap for the patches')
 parser.add_argument('--window_size', type=int, default=6, help='Window size for the patch series. This includes the predict horizon')
@@ -31,6 +32,12 @@ parser.add_argument('--N_T', type=int, default=3, help='Number of Temporal Layer
 parser.add_argument('--hid_S', type=int, default=32, help='Number of hidden Encoder Layers')
 parser.add_argument('--hid_T', type=int, default=128, help='Number of hidden Temporal Layers')
 parser.add_argument('--exp_name', type=str, default='exp01', help='Experiment name')
+parser.add_argument('--scheduler_step_size', type=int, default=100, help='Number of epochs to change learning rate')
+parser.add_argument('--scheduler_decay_factor', type=float, default=0.1, help='Multiplicative factor of learning rate decay.')
+parser.add_argument('-optm', '--optmizer', type=str, default='adam', choices=['adam', 'sgd'], help='Optmizer name to be used in the training')
+parser.add_argument('--sgd_momentum', type=float, default=0.9, help='SGD momemtum. Only applicable if optmizer is sgd')
+parser.add_argument('--focal_gamma', type=float, default=4.5, help='Focal loss gamma hyperparameter')
+parser.add_argument('--focal_alpha', type=float, default=None, help='Focal loss alpha hyperparameter')
 args = parser.parse_args()
 
 batch_size = args.batch_size
@@ -91,12 +98,11 @@ custom_training_config = {
     'batch_size': batch_size,
     'val_batch_size': batch_size,
     'epoch': 100,
-    'lr': 1e-4,
+    'lr': args.learning_rate,
     # 'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score', 'CM'],
     'metrics': ['mse', 'mae'],
 
     'ex_name': args.exp_name, # custom_exp
-    'dataname': 'custom',
     'in_shape': [4, 1, height, width], # T, C, H, W = self.args.in_shape
     'patience': 10,
     'delta': 0.0001,
@@ -107,7 +113,13 @@ custom_training_config = {
     'overlap': overlap,
     'loss': 'focal',
     'aux_metrics': ['f1_score0', 'f1_score1', 'CM'],
-    'normalize': normalize
+    'normalize': normalize,
+    'scheduler_step_size': args.scheduler_step_size,
+    'scheduler_decay_factor': args.scheduler_decay_factor,
+    'optmizer': args.optmizer,
+    'sgd_momentum': args.sgd_momentum,
+    'focal_gamma': args.focal_gamma,
+    'focal_alpha': args.focal_alpha
 }
 
 custom_model_config = {

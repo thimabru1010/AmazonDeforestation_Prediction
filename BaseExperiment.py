@@ -11,25 +11,25 @@ import numpy as np
 import torch.nn.functional as F
 from torchsummary import summary
 from preprocess import load_tif_image, preprocess_patches, divide_pred_windows, reconstruct_sorted_patches, reconstruct_time_patches
-
+from torch.optim.lr_scheduler import StepLR
 from CustomLosses import WMSELoss, WMAELoss
 
 class BaseExperiment():
-    def __init__(self, trainloader, valloader, custom_model_config, custom_training_config, seed=42):
+    def __init__(self, trainloader, valloader, custom_model_config, training_config, seed=42):
         # TODO: wrap into a function to create work dir
         # Create work dir
-        self.work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
+        self.work_dir_path = os.path.join('work_dirs', training_config['ex_name'])
         if not os.path.exists(self.work_dir_path):
             os.makedirs(self.work_dir_path)
             
         self._save_json(custom_model_config, 'model_config.json')
-        self._save_json(custom_training_config, 'model_training.json')
+        self._save_json(training_config, 'model_training.json')
             
-        self.epochs = custom_training_config['epoch']
-        self.patience = custom_training_config['patience']
-        self.delta = custom_training_config['delta']
+        self.epochs = training_config['epoch']
+        self.patience = training_config['patience']
+        self.delta = training_config['delta']
         self.device = "cuda:0"
-        in_shape = custom_training_config['in_shape']
+        in_shape = training_config['in_shape']
         
         print('Input shape:', in_shape)
         torch.manual_seed(seed)
@@ -38,13 +38,13 @@ class BaseExperiment():
         self.aux_metrics = {}
         if custom_model_config['num_classes']:
             self.classification = True
-            if custom_training_config['loss'] == 'focal':
-                self.loss = FocalLoss(mode='multiclass', gamma=4.5, ignore_index=-1)
-            elif custom_training_config['loss'] == 'ce':
+            if training_config['loss'] == 'focal':
+                self.loss = FocalLoss(mode='multiclass', alpha=training_config['focal_alpha'],\
+                    gamma=training_config['focal_gamma'], ignore_index=-1)
+            elif training_config['loss'] == 'ce':
                 class_weights = torch.tensor([1, 1], dtype=torch.float32).to(self.device)
                 self.loss = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
-            #TODO: add auxiliary metrics
-            for metric in custom_training_config['aux_metrics']:
+            for metric in training_config['aux_metrics']:
                 if metric == 'f1_score0':
                     self.aux_metrics['f1_score0'] = f1_score0
                 elif metric == 'f1_score1':
@@ -63,11 +63,15 @@ class BaseExperiment():
         
         print(summary(self.model, tuple(in_shape)))
         
+        if training_config['optmizer'] == 'adam':
+            self.optm = optm.Adam(self.model.parameters(), lr=training_config['lr'])
+        elif training_config['optmizer'] == 'sgd':
+            self.optm = optm.SGD(self.model.parameters(), lr=training_config['lr'], momentum=training_config['sgd_momentum'])
         
+        self.scheduler = StepLR(self.optm, step_size=training_config['scheduler_step_size'],\
+            gamma=training_config['scheduler_decay_factor'])
         
-        self.optm = optm.Adam(self.model.parameters(), lr=custom_training_config['lr'])
-        
-        # if custom_training_config['amazon_mask'] and custom_training_config['pixel_size'] == '25K':
+        # if training_config['amazon_mask'] and training_config['pixel_size'] == '25K':
         #     mask = load_tif_image('data/IBAMA_INPE/25K/INPE/tiff/mask.tif')
             
         # self.loss = WMSELoss(weight=1)
@@ -156,6 +160,9 @@ class BaseExperiment():
             
             val_loss, val_mae, val_aux_metrics = self.validate_one_epoch()
             
+            last_lr = self.scheduler.get_last_lr()[0]
+            self.scheduler.step()
+            
             if val_loss + self.delta < min_val_loss:
                 min_val_loss = val_loss
                 early_stop_counter = 0
@@ -167,7 +174,7 @@ class BaseExperiment():
             if early_stop_counter >= self.patience:
                 print(f'Early Stopping! Early Stopping counter: {early_stop_counter}')
                 break
-            terminal_str = f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}"
+            terminal_str = f"Epoch {epoch}: LR = {last_lr[0]:.6f} Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}"
             for metric_name in val_aux_metrics.keys():
                 if metric_name != 'CM':
                     terminal_str += f" | Validation {metric_name} = {val_aux_metrics[metric_name]:.6f}"
@@ -179,10 +186,10 @@ class BaseExperiment():
 def _build_model(in_shape, nclasses, custom_model_config, device):
     return SimVP_Model(in_shape=in_shape, nclasses=nclasses, **custom_model_config).to(device)
 
-def test_model(testloader, custom_training_config, custom_model_config):
-    work_dir_path = os.path.join('work_dirs', custom_training_config['ex_name'])
+def test_model(testloader, training_config, custom_model_config):
+    work_dir_path = os.path.join('work_dirs', training_config['ex_name'])
     device = "cuda:0"
-    in_shape = custom_training_config['in_shape']
+    in_shape = training_config['in_shape']
     
     model = _build_model(in_shape, custom_model_config['num_classes'], custom_model_config, device)
     # model = _build_model(in_shape, None, custom_model_config, device)
@@ -194,7 +201,7 @@ def test_model(testloader, custom_training_config, custom_model_config):
     if custom_model_config['num_classes']:
         classification = True
         #TODO: add auxiliary metrics
-        for metric in custom_training_config['aux_metrics']:
+        for metric in training_config['aux_metrics']:
             if metric == 'f1_score0':
                 aux_metrics['f1_score0'] = f1_score0
             elif metric == 'f1_score1':
