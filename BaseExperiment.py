@@ -332,8 +332,8 @@ def test_model(testloader, training_config, custom_model_config):
     print(FP, FN)
     prec = TN/(TN+FN)
     rec = TN/(TN+FP)
-    f1_score1 = 2 * prec * rec / (prec + rec)
-    print(f'F1 Score Class 1: {f1_score1:.6f}')
+    _f1_score1 = 2 * prec * rec / (prec + rec)
+    print(f'F1 Score Class 1: {_f1_score1:.6f}')
     return preds
     
     # TODO: Adapt Baseline Test to classification
