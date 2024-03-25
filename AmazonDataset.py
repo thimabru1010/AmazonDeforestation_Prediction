@@ -6,7 +6,7 @@ import os
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from preprocess import load_tif_image, preprocess_patches, divide_pred_windows, extract_sorted_patches, extract_temporal_sorted_patches
+from preprocess import load_npy_image, load_tif_image, preprocess_patches, divide_pred_windows, extract_sorted_patches, extract_temporal_sorted_patches
 from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -441,9 +441,11 @@ class IbamaDETER1km_Dataset(Dataset):
         ibama_folder_path = root_dir / 'tiff_filled'
         self.ibama_folder_path = ibama_folder_path
         if mode == 'train':
-            deter_img = load_tif_image('data/DETER/deter_increments_1km_1week.tif')
+            # deter_img = load_tif_image('data/DETER/deter_increments_1km_1week.tif')
+            deter_img = load_npy_image('data/DETER/deter_increments_1km_1week.npy')
             
-            mask = load_tif_image('data/IBAMA_INPE/1K/tiff_filled/mask.tif')
+            # mask = load_tif_image('data/IBAMA_INPE/1K/tiff_filled/mask.tif')
+            mask = load_npy_image('data/IBAMA_INPE/1K/tiff_filled/mask.npy')
             mask = mask[:deter_img.shape[1], :deter_img.shape[2]]
             
             # deter_img[:, mask == 0] = -1

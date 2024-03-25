@@ -13,6 +13,15 @@ def load_tif_image(tif_path):
     gdal_header = gdal.Open(str(tif_path))
     return gdal_header.ReadAsArray()
 
+def load_npy_image(npy_path):
+    return np.load(str(npy_path))
+
+def apply_legal_amazon_mask(input_image: np.array, amazon_mask: np.array):
+    ''' Apply Legal Amazon mask '''
+    for i in range(input_image.shape[0]):
+        input_image[i, :, :][amazon_mask == 2.0] = 2
+    return input_image
+
 def extract_patches(image: np.ndarray, patch_size: int, stride: int) -> np.ndarray:
     if len(image.shape) == 3:
         window_shape_array = (image.shape[0], patch_size, patch_size)

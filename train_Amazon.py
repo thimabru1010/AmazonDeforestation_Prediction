@@ -11,31 +11,37 @@ from albumentations.pytorch import ToTensorV2
 import pandas as pd
 import geopandas as gpd
 from BaseExperiment import BaseExperiment, test_model
-from preprocess import reconstruct_time_patches
+from preprocess import reconstruct_time_patches, load_tif_image, load_npy_image
 import os
+import argparse
 
-def load_tif_image(tif_path):
-    gdal_header = gdal.Open(str(tif_path))
-    return gdal_header.ReadAsArray()
+parser = create_parser()
+parser.add_argument('--root_dir', type=str,\
+    default='/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE', help='Root directory for the dataset')
+parser.add_argument('--batch_size', type=int, default=16, help='Batch size for the dataset')
+parser.add_argument('--patch_size', type=int, default=128, help='Patch size for the dataset')
+parser.add_argument('--overlap', type=float, default=0.15, help='Overlap for the patches')
+parser.add_argument('--window_size', type=int, default=6, help='Window size for the patch series. This includes the predict horizon')
+parser.add_argument('--min_def', type=float, default=0.005, help='Minimum deforestation value for the dataset')
+parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for data loading')
+parser.add_argument('--debug', action='store_true', help='Enable or disable debug mode')
+parser.add_argument('--not_normalize', action='store_false', help='Enable or disable normalization')
+parser.add_argument('--pixel_size', type=str, default='1K', help='Pixel size for the images')
+args = parser.parse_args()
 
-def apply_legal_amazon_mask(input_image: np.array, amazon_mask: np.array):
-    ''' Apply Legal Amazon mask '''
-    for i in range(input_image.shape[0]):
-        input_image[i, :, :][amazon_mask == 2.0] = 2
-    return input_image
+batch_size = args.batch_size
+num_workers = args.num_workers
+Debug = args.debug
+pixel_size = args.pixel_size
 
-batch_size = 16
-num_workers = 8
-Debug = False
-pixel_size = '1K'
+patch_size = args.patch_size
+overlap = args.overlap
+window_size = args.window_size
+min_def = args.min_def
+normalize = args.not_normalize
 
-patch_size = 128
-overlap = 0.15
-window_size = 6
-min_def = 0.005
-normalize = True
-
-root_dir = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE/{pixel_size}')
+# root_dir = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE/{pixel_size}')
+root_dir = Path(args.root_dir) / pixel_size
 print(root_dir)
 
 prob = 0.5
