@@ -63,6 +63,8 @@ class BaseExperiment():
         
         print(summary(self.model, tuple(in_shape)))
         
+        
+        
         self.optm = optm.Adam(self.model.parameters(), lr=custom_training_config['lr'])
         
         # if custom_training_config['amazon_mask'] and custom_training_config['pixel_size'] == '25K':
@@ -140,8 +142,9 @@ class BaseExperiment():
         val_loss = val_loss / len(self.valloader)
         val_mae = val_mae / len(self.valloader)
         for metric_name in self.aux_metrics.keys():
-            val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / len(self.valloader)
-        
+            if metric_name != 'CM':
+                val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / len(self.valloader)
+
         return val_loss, val_mae, val_aux_metrics
     
     def train(self):
