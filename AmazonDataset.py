@@ -13,8 +13,11 @@ from albumentations.pytorch import ToTensorV2
 from sklearn.model_selection import train_test_split
 from datetime import datetime
 
-from osgeo import gdal
-gdal.PushErrorHandler('CPLQuietErrorHandler')
+try:
+    from osgeo import gdal
+    gdal.PushErrorHandler('CPLQuietErrorHandler')
+except ImportError:
+    print("osgeo module is not installed. Please install it with pip install GDAL")
 
 class CustomDataset(Dataset):
     def __init__(self, root_dir: Path, normalize: bool=False, transform: torchvision.transforms=None,
