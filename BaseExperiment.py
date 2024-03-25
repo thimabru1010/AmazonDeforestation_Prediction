@@ -174,7 +174,7 @@ class BaseExperiment():
             if early_stop_counter >= self.patience:
                 print(f'Early Stopping! Early Stopping counter: {early_stop_counter}')
                 break
-            terminal_str = f"Epoch {epoch}: LR = {last_lr:.6f} Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}"
+            terminal_str = f"Epoch {epoch}: LR = {last_lr:.8f} | Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}"
             for metric_name in val_aux_metrics.keys():
                 if metric_name != 'CM':
                     terminal_str += f" | Validation {metric_name} = {val_aux_metrics[metric_name]:.6f}"
@@ -268,14 +268,11 @@ def test_model(testloader, training_config, custom_model_config):
                 
             else:
                 preds.append(y_pred.cpu().numpy()[0, 0, 0])  
-                
                 if torch.all(labels == -1):
                     skip_cont += 1
                     continue
-                
                 loss = mse(y_pred, labels.to(device))
                 _mae = mae(y_pred, labels.to(device))
-                    
                 test_loss += loss.detach()
                 test_mae += _mae.detach()
             
@@ -305,19 +302,41 @@ def test_model(testloader, training_config, custom_model_config):
             print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')
             # preds = np.stack(preds, axis=0)
             # print(preds.shape)
+            test_loss = 0.0
+        
+        val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
+        for inputs, labels in tqdm(testloader):
+
+            if torch.all(labels == -1):
+                skip_cont += 1
+                continue
+            
+            # y_pred = y_pred[labels != -1].numpy()
+            labels = labels[labels != -1].numpy()
+            
+            for metric_name in aux_metrics.keys():
+                val_aux_metrics[metric_name] += aux_metrics[metric_name](labels, labels)
+                
+            # test_loss += loss.detach()
+            # test_mae += _mae.detach()
+
+        # test_loss = test_loss / (len(testloader) - skip_cont)
+        # test_mae = test_mae / (len(testloader) - skip_cont)
+        
+        print("======== Classification Baseline Metrics ========")
+        for metric_name in aux_metrics.keys():
+            val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
+            terminal_str = f""
+            for metric_name in val_aux_metrics.keys():
+                if metric_name != 'CM':
+                    terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
+            print(terminal_str)
+            print(val_aux_metrics['CM'])
     return preds
-    
-    # preds_reconstructed = reconstruct_time_patches(preds, patch_size=64, time_idx=44, original_img_shape=(2333, 3005))
-    # np.save('data/reconstructed_images.npy', preds_reconstructed)
-    # del preds_reconstructed
-    
-    # def_preds_reconstructed = reconstruct_time_patches(preds_def, patch_size=64, time_idx=44, original_img_shape=(2333, 3005))
-    # np.save('data/def_reconstructed_images.npy', def_preds_reconstructed)
-    # del def_preds_reconstructed
     
     # TODO: Adapt Baseline Test to classification
     #! Baseline test
-    # # Check if the model outputed zero por all pixels
+    # Check if the model outputed zero por all pixels
     # test_loss = 0.0
     # test_mae = 0.0
     # # Disable gradient computation and reduce memory consumption.
