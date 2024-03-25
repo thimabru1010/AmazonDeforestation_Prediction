@@ -552,15 +552,16 @@ class IbamaDETER1km_Dataset(Dataset):
         if self.normalize:
             data = data - self.mean / self.std
             
-        data = np.expand_dims(data, axis=1)
+        # data = np.expand_dims(data, axis=1)
             
         if self.transform:
             # For albumentations the image needs to be in shape (H, W, C)
-            transformed = self.transform(image=data.reshape(data.shape[2], data.shape[3], -1), mask=labels)
-            data = transformed['image'].reshape(data.shape[0], data.shape[1], data.shape[2], data.shape[3])
-            labels = transformed['mask']
+            # print(data.shape, labels.shape)
+            transformed = self.transform(image=data.reshape(data.shape[1], data.shape[2], -1), mask=labels.reshape(data.shape[1], data.shape[2], -1))
+            data = transformed['image'].reshape(data.shape[0], data.shape[1], data.shape[2])
+            labels = transformed['mask'].reshape(labels.shape[0], labels.shape[1], labels.shape[2])
         else:
             data = torch.tensor(data)
             labels = torch.tensor(labels)
-         
-        return data.float(), labels.unsqueeze(1).float()
+        # print(data.shape, labels.shape)
+        return data.unsqueeze(1).float(), labels.unsqueeze(1).float()
