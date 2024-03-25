@@ -115,9 +115,9 @@ custom_model_config = {
     # Here, we directly set these parameters
     'model_type': 'gSTA',
     'N_S': 3,
-    'N_T': 4,
+    'N_T': 5,
     'hid_S': 32, # default: 64
-    'hid_T': 128, # default: 256,
+    'hid_T': 256, # default: 256,
     'classification': True,
     'num_classes': 2
 }
