@@ -3,6 +3,7 @@ import numpy as np
 from skimage.util.shape import view_as_windows
 try:
     from osgeo import gdal
+    gdal.PushErrorHandler('CPLQuietErrorHandler')
 except ImportError:
     print("osgeo module is not installed. Please install it with pip install GDAL")
 # from osgeo import gdal
@@ -12,7 +13,6 @@ import pathlib
 from tqdm import tqdm
 from time import time
 
-gdal.PushErrorHandler('CPLQuietErrorHandler')
 def load_tif_image(tif_path):
     gdal_header = gdal.Open(str(tif_path))
     return gdal_header.ReadAsArray()
