@@ -3,7 +3,7 @@ import torch
 from AmazonDataset import IbamaInpe25km_Dataset, IbamaDETER1km_Dataset
 from pathlib import Path
 import numpy as np
-from openstl.utils import create_parser, default_parser
+# from openstl.utils import create_parser, default_parser
 import json
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -14,7 +14,7 @@ from preprocess import reconstruct_time_patches, load_tif_image, load_npy_image
 import os
 import argparse
 
-parser = create_parser()
+parser = argparse.create_parser()
 parser.add_argument('--root_dir', type=str,\
     default='/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE', help='Root directory for the dataset')
 parser.add_argument('--batch_size', type=int, default=16, help='Batch size for the dataset')
