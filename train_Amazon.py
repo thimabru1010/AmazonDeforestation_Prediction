@@ -139,12 +139,12 @@ custom_model_config = {
     'num_classes': 2
 }
 
-# exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
+exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
 
 mean_std = np.stack((train_set.mean, train_set.std))
 np.save(os.path.join('work_dirs', custom_training_config['ex_name'], 'mean_std.npy'), mean_std)
 
-# exp.train()
+exp.train()
 
 #TODO: pass test patches to the experiment
 if pixel_size == '25K':

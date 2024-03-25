@@ -178,14 +178,15 @@ class BaseExperiment():
             
             cm = val_aux_metrics['CM']
             TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]
-            prec = TN/(TN+FN)
-            rec = TN/(TN+FP)
-            _f1_score = 2 * prec * rec / (prec + rec)
-            val_aux_metrics['f1_score1'] = _f1_score
             prec = TP/(TP+FP)
             rec = TP/(TP+FN)
             _f1_score = 2 * prec * rec / (prec + rec)
             val_aux_metrics['f1_score0'] = _f1_score
+            
+            prec = TN/(TN+FN)
+            rec = TN/(TN+FP)
+            _f1_score = 2 * prec * rec / (prec + rec)
+            val_aux_metrics['f1_score1'] = _f1_score
             
             for metric_name in val_aux_metrics.keys():
                 if metric_name != 'CM':
@@ -303,14 +304,15 @@ def test_model(testloader, training_config, custom_model_config):
                 val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
             cm = val_aux_metrics['CM']
             TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]
-            prec = TN/(TN+FN)
-            rec = TN/(TN+FP)
-            _f1_score = 2 * prec * rec / (prec + rec)
-            val_aux_metrics['f1_score1'] = _f1_score
             prec = TP/(TP+FP)
             rec = TP/(TP+FN)
             _f1_score = 2 * prec * rec / (prec + rec)
             val_aux_metrics['f1_score0'] = _f1_score
+            
+            prec = TN/(TN+FN)
+            rec = TN/(TN+FP)
+            _f1_score = 2 * prec * rec / (prec + rec)
+            val_aux_metrics['f1_score1'] = _f1_score
             
             terminal_str = f""
             for metric_name in val_aux_metrics.keys():
@@ -326,60 +328,35 @@ def test_model(testloader, training_config, custom_model_config):
             # preds = np.stack(preds, axis=0)
             # print(preds.shape)
             test_loss = 0.0
-        
-    #! Classification Baseline Metrics
-    skip_cont = 0
-    val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
-    for inputs, labels in tqdm(testloader):
-        if torch.all(labels == -1):
-            skip_cont += 1
-            continue
-        
-        # y_pred = y_pred[labels != -1].numpy()
-        labels = labels[labels != -1].numpy()
-        
-        for metric_name in aux_metrics.keys():
-            val_aux_metrics[metric_name] += aux_metrics[metric_name](labels, labels)
-    print('Skip cont:', skip_cont)
-    print("======== Classification Baseline Metrics ========")
-    for metric_name in aux_metrics.keys():
-        val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
-        terminal_str = f""
-        for metric_name in val_aux_metrics.keys():
-            if metric_name != 'CM':
-                terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
-    print(terminal_str)
-    print(val_aux_metrics['CM'])
-    cm = val_aux_metrics['CM']
-    TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]
-    print(FP, FN)
-    prec = TN/(TN+FN)
-    rec = TN/(TN+FP)
-    _f1_score1 = 2 * prec * rec / (prec + rec)
-    print(f'F1 Score Class 1: {_f1_score1:.6f}')
     return preds
-    
-    # TODO: Adapt Baseline Test to classification
-    #! Baseline test
-    # Check if the model outputed zero por all pixels
-    # test_loss = 0.0
-    # test_mae = 0.0
-    # # Disable gradient computation and reduce memory consumption.
+
+    # #! Classification Baseline Metrics
+    # skip_cont = 0
+    # val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
     # for inputs, labels in tqdm(testloader):
-    #     # y_pred = model(inputs.to(device))
     #     if torch.all(labels == -1):
     #         skip_cont += 1
     #         continue
-    #     y_pred = torch.zeros_like(labels)
         
-    #     loss = mse(y_pred, labels)
-    #     _mae = mae(y_pred, labels)
-            
-    #     test_loss += loss.detach()
-    #     test_mae += _mae.detach()
-
-    # test_loss = test_loss / (len(testloader) - skip_cont)
-    # test_mae = test_mae / (len(testloader) - skip_cont)
-    
-    # print("======== Zero Pred Baseline Metrics ========")
-    # print(f'MSE: {test_loss:.6f} | MAE: {test_mae:.6f}')
+    #     # y_pred = y_pred[labels != -1].numpy()
+    #     labels = labels[labels != -1].numpy()
+        
+    #     for metric_name in aux_metrics.keys():
+    #         val_aux_metrics[metric_name] += aux_metrics[metric_name](labels, labels)
+    # print('Skip cont:', skip_cont)
+    # print("======== Classification Baseline Metrics ========")
+    # for metric_name in aux_metrics.keys():
+    #     val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
+    #     terminal_str = f""
+    #     for metric_name in val_aux_metrics.keys():
+    #         if metric_name != 'CM':
+    #             terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
+    # print(terminal_str)
+    # print(val_aux_metrics['CM'])
+    # cm = val_aux_metrics['CM']
+    # TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]
+    # print(FP, FN)
+    # prec = TN/(TN+FN)
+    # rec = TN/(TN+FP)
+    # _f1_score1 = 2 * prec * rec / (prec + rec)
+    # print(f'F1 Score Class 1: {_f1_score1:.6f}')
