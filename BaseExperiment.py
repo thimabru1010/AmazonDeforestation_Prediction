@@ -174,7 +174,7 @@ class BaseExperiment():
             if early_stop_counter >= self.patience:
                 print(f'Early Stopping! Early Stopping counter: {early_stop_counter}')
                 break
-            terminal_str = f"Epoch {epoch}: LR = {last_lr[0]:.6f} Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}"
+            terminal_str = f"Epoch {epoch}: LR = {last_lr:.6f} Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}"
             for metric_name in val_aux_metrics.keys():
                 if metric_name != 'CM':
                     terminal_str += f" | Validation {metric_name} = {val_aux_metrics[metric_name]:.6f}"
