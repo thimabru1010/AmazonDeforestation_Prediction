@@ -4,7 +4,6 @@ from AmazonDataset import IbamaInpe25km_Dataset, IbamaDETER1km_Dataset
 from pathlib import Path
 import numpy as np
 from openstl.utils import create_parser, default_parser
-from osgeo import gdal
 import json
 import albumentations as A
 from albumentations.pytorch import ToTensorV2

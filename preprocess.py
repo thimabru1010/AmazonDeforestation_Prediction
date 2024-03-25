@@ -1,7 +1,11 @@
 import argparse
 import numpy as np
 from skimage.util.shape import view_as_windows
-from osgeo import gdal
+try:
+    from osgeo import gdal
+except ImportError:
+    print("osgeo module is not installed. Please install it with pip install GDAL")
+# from osgeo import gdal
 import matplotlib.pyplot as plt
 import os
 import pathlib
