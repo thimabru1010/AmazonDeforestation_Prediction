@@ -175,6 +175,18 @@ class BaseExperiment():
                 print(f'Early Stopping! Early Stopping counter: {early_stop_counter}')
                 break
             terminal_str = f"Epoch {epoch}: LR = {last_lr:.8f} | Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}"
+            
+            cm = val_aux_metrics['CM']
+            TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]
+            prec = TN/(TN+FN)
+            rec = TN/(TN+FP)
+            _f1_score = 2 * prec * rec / (prec + rec)
+            val_aux_metrics['f1_score1'] = _f1_score
+            prec = TP/(TP+FP)
+            rec = TP/(TP+FN)
+            _f1_score = 2 * prec * rec / (prec + rec)
+            val_aux_metrics['f1_score0'] = _f1_score
+            
             for metric_name in val_aux_metrics.keys():
                 if metric_name != 'CM':
                     terminal_str += f" | Validation {metric_name} = {val_aux_metrics[metric_name]:.6f}"
@@ -289,6 +301,17 @@ def test_model(testloader, training_config, custom_model_config):
         if classification:
             for metric_name in aux_metrics.keys():
                 val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
+            cm = val_aux_metrics['CM']
+            TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]
+            prec = TN/(TN+FN)
+            rec = TN/(TN+FP)
+            _f1_score = 2 * prec * rec / (prec + rec)
+            val_aux_metrics['f1_score1'] = _f1_score
+            prec = TP/(TP+FP)
+            rec = TP/(TP+FN)
+            _f1_score = 2 * prec * rec / (prec + rec)
+            val_aux_metrics['f1_score0'] = _f1_score
+            
             terminal_str = f""
             for metric_name in val_aux_metrics.keys():
                 if metric_name != 'CM':

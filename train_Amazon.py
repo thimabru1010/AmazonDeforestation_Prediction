@@ -112,7 +112,7 @@ custom_training_config = {
     'window_size': window_size,
     'overlap': overlap,
     'loss': 'focal',
-    'aux_metrics': ['f1_score0', 'f1_score1', 'CM'],
+    'aux_metrics': ['CM'],
     'normalize': normalize,
     'scheduler_step_size': args.scheduler_step_size,
     'scheduler_decay_factor': args.scheduler_decay_factor,
