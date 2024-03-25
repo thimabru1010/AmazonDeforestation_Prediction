@@ -39,7 +39,7 @@ class BaseExperiment():
         if custom_model_config['num_classes']:
             self.classification = True
             if custom_training_config['loss'] == 'focal':
-                self.loss = FocalLoss(mode='multiclass', gamma=3.5, ignore_index=-1)
+                self.loss = FocalLoss(mode='multiclass', gamma=4.5, ignore_index=-1)
             elif custom_training_config['loss'] == 'ce':
                 class_weights = torch.tensor([1, 1], dtype=torch.float32).to(self.device)
                 self.loss = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)

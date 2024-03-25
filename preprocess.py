@@ -103,6 +103,7 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6,
                 mean = np.mean(_label, axis=(0, 1))
                 # Deal with Nan
                 if np.isnan(mean): mean = 0
+                if mean < 0: mean = 0
                 if mean < min_def:
                     # print('entered if')
                     skipped_count += 1

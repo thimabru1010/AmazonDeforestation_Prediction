@@ -444,6 +444,10 @@ class IbamaDETER1km_Dataset(Dataset):
             deter_img = load_tif_image('data/DETER/deter_increments_1km_1week.tif')
             
             mask = load_tif_image('data/IBAMA_INPE/1K/tiff_filled/mask.tif')
+            mask = mask[:deter_img.shape[1], :deter_img.shape[2]]
+            
+            # deter_img[:, mask == 0] = -1
+            deter_img[deter_img > 0] = 1
             # xcut = (deter_img.shape[1] // patch_size) * patch_size
             # ycut = (deter_img.shape[2] // patch_size) * patch_size
             # deter_img = deter_img[:, :xcut, :ycut]
@@ -455,6 +459,7 @@ class IbamaDETER1km_Dataset(Dataset):
             # 2022 = 1 * 48 = 48
             deter_img_val = deter_img[96:(96 + 48)]
             # 2023 = 1 * 48 = 48
+            # deter_img_test = deter_img[(96 + 48):(96 + 48 + 48)]
             deter_img_test = deter_img[(96 + 48):(96 + 48 + 48)]
             del deter_img
             
@@ -488,7 +493,7 @@ class IbamaDETER1km_Dataset(Dataset):
             print(f'Training shape: {self.data_files.shape} - {self.mask_files.shape}')
             
             # Only using min_def != 0 to speed training. Validation should not use this
-            self.val_files, self.mask_val_files, _ = divide_pred_windows(val_patches, min_def=min_def, window_size=window_size,\
+            self.val_files, self.mask_val_files, _ = divide_pred_windows(val_patches, min_def=min_def/100, window_size=window_size,\
                 mask_patches=mask_val_patches)
             print(f'Validation shape: {self.val_files.shape} - {self.mask_val_files.shape}')
             
@@ -530,6 +535,7 @@ class IbamaDETER1km_Dataset(Dataset):
         # Apply Legal Amazon Mask
         # No negative values should be present in input data
         data[:, mask == 0] = 0
+        data[data > 0] = 1 # Make every deforestation area to 1
         # data[data == -1] = 0
         # Negative values will be filtered in the cost function
         labels[:, mask == 0] = -1

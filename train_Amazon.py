@@ -29,10 +29,10 @@ num_workers = 8
 Debug = False
 pixel_size = '1K'
 
-patch_size = 64
+patch_size = 128
 overlap = 0.15
 window_size = 6
-min_def = 0.0005
+min_def = 0.005
 normalize = True
 
 root_dir = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE/{pixel_size}')
@@ -93,6 +93,7 @@ custom_training_config = {
     'amazon_mask': True,
     'pixel_size': pixel_size,
     'patch_size': patch_size,
+    'window_size': window_size,
     'overlap': overlap,
     'loss': 'focal',
     'aux_metrics': ['f1_score0', 'f1_score1', 'CM'],
@@ -109,7 +110,7 @@ custom_model_config = {
     # Here, we directly set these parameters
     'model_type': 'gSTA',
     'N_S': 3,
-    'N_T': 3,
+    'N_T': 4,
     'hid_S': 32, # default: 64
     'hid_T': 128, # default: 256,
     'classification': True,
@@ -117,6 +118,9 @@ custom_model_config = {
 }
 
 exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
+
+mean_std = np.stack((train_set.mean, train_set.std))
+np.save(os.path.join('work_dirs', custom_training_config['ex_name'], 'mean_std.npy'), mean_std)
 
 exp.train()
 
@@ -142,7 +146,7 @@ print('Reconstructing patches....')
 print(preds.shape)
 preds_clssf = np.argmax(preds, axis=1)
 print(preds_clssf.shape)
-preds_reconstructed = reconstruct_time_patches(preds_clssf, patch_size=64, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
+preds_reconstructed = reconstruct_time_patches(preds_clssf, patch_size=patch_size, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
 print('Preds reconstructed')
 np.save(os.path.join(work_dir_path, 'preds_reconstructed.npy'), preds_reconstructed)
 del preds_reconstructed
@@ -150,7 +154,7 @@ del preds_reconstructed
 print('Reconstructing def preds....')
 preds_def = preds[:, 1]
 
-def_preds_reconstructed = reconstruct_time_patches(preds_def, patch_size=64, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
+def_preds_reconstructed = reconstruct_time_patches(preds_def, patch_size=patch_size, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
 print('Def Preds reconstructed')
 np.save(os.path.join(work_dir_path, 'def_preds_reconstructed.npy'), def_preds_reconstructed)
 del def_preds_reconstructed
