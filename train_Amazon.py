@@ -14,7 +14,7 @@ from preprocess import reconstruct_time_patches, load_tif_image, load_npy_image
 import os
 import argparse
 
-parser = argparse.create_parser()
+parser = argparse.ArgumentParser(description='Amazon Deforestation Prediction')
 parser.add_argument('--root_dir', type=str,\
     default='/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE', help='Root directory for the dataset')
 parser.add_argument('--batch_size', type=int, default=16, help='Batch size for the dataset')
