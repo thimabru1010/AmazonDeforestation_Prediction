@@ -26,6 +26,11 @@ parser.add_argument('--num_workers', type=int, default=8, help='Number of worker
 parser.add_argument('--debug', action='store_true', help='Enable or disable debug mode')
 parser.add_argument('--not_normalize', action='store_false', help='Enable or disable normalization')
 parser.add_argument('--pixel_size', type=str, default='1K', help='Pixel size for the images')
+parser.add_argument('--N_S', type=int, default=3, help='Number of Encoder Layers')
+parser.add_argument('--N_T', type=int, default=3, help='Number of Temporal Layers')
+parser.add_argument('--hid_S', type=int, default=32, help='Number of hidden Encoder Layers')
+parser.add_argument('--hid_T', type=int, default=128, help='Number of hidden Temporal Layers')
+parser.add_argument('--exp_name', type=str, default='exp01', help='Experiment name')
 args = parser.parse_args()
 
 batch_size = args.batch_size
@@ -48,7 +53,7 @@ copy_fn = lambda x, **kwargs: x.copy()
 transform = A.Compose(
     [
         # TODO: Make Random Rotate work
-        #A.RandomRotate90(p=prob),
+        A.RandomRotate90(p=prob),
         A.OneOf([A.HorizontalFlip(p=prob), A.VerticalFlip(p=prob)]),
         A.Lambda(image=copy_fn, mask=copy_fn),
         ToTensorV2()
@@ -90,7 +95,7 @@ custom_training_config = {
     # 'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score', 'CM'],
     'metrics': ['mse', 'mae'],
 
-    'ex_name': 'custom_exp2', # custom_exp
+    'ex_name': args.exp_name, # custom_exp
     'dataname': 'custom',
     'in_shape': [4, 1, height, width], # T, C, H, W = self.args.in_shape
     'patience': 10,
@@ -114,10 +119,10 @@ custom_model_config = {
     
     # Here, we directly set these parameters
     'model_type': 'gSTA',
-    'N_S': 3,
-    'N_T': 5,
-    'hid_S': 32, # default: 64
-    'hid_T': 256, # default: 256,
+    'N_S': args.N_S,
+    'N_T': args.N_T,
+    'hid_S': args.hid_S, # default: 64
+    'hid_T': args.hid_T, # default: 256,
     'classification': True,
     'num_classes': 2
 }
