@@ -39,7 +39,9 @@ class BaseExperiment():
         if custom_model_config['num_classes']:
             self.classification = True
             if training_config['loss'] == 'focal':
-                self.loss = FocalLoss(mode='multiclass', alpha=training_config['focal_alpha'],\
+                # self.loss = FocalLoss(mode='multiclass', alpha=training_config['focal_alpha'],\
+                #     gamma=training_config['focal_gamma'], ignore_index=-1)
+                self.loss = FocalLoss(mode='binary', alpha=training_config['focal_alpha'],\
                     gamma=training_config['focal_gamma'], ignore_index=-1)
             elif training_config['loss'] == 'ce':
                 class_weights = torch.tensor([1, 1], dtype=torch.float32).to(self.device)
@@ -130,8 +132,11 @@ class BaseExperiment():
                 
                 loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
                 # mae = self.mae(y_pred, labels.to(self.device))
-                y_pred = F.softmax(y_pred, dim=1)
-                y_pred = torch.argmax(y_pred, dim=1)
+                # y_pred = F.softmax(y_pred, dim=1)
+                # y_pred = torch.argmax(y_pred, dim=1)
+                y_pred = F.sigmoid(y_pred, dim=1)
+                y_pred[y_pred >= 0.5] = 1
+                y_pred[y_pred < 0.5] = 0
                 labels = labels.squeeze(2)
                 # print(y_pred.shape, labels.shape)
                 y_pred = y_pred[labels != -1].cpu().numpy()
@@ -238,6 +243,7 @@ def test_model(testloader, training_config, custom_model_config):
     skip_cont = 0
     preds = []
     preds_def = []
+    labels_stack = []
     val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
     with torch.no_grad():
         for inputs, labels in tqdm(testloader):
@@ -257,12 +263,18 @@ def test_model(testloader, training_config, custom_model_config):
                 y_pred = y_pred.cpu()
                 labels = labels.cpu()
                 
-                y_pred = F.softmax(y_pred, dim=1)
+                # y_pred = F.softmax(y_pred, dim=1)
+                y_pred = F.sigmoid(y_pred, dim=1)
                 # print(y_pred.shape)
                 preds.append(y_pred[0].numpy())
+                labels_stack.append(labels.numpy())
                 # preds_def.append(y_pred[0, 1].numpy())
                 
-                y_pred = torch.argmax(y_pred, dim=1).squeeze(1)
+                # y_pred = torch.argmax(y_pred, dim=1).squeeze(1)
+                y_pred[y_pred >= 0.5] = 1
+                y_pred[y_pred < 0.5] = 0
+                #TODO: verificar se vai dar problema com sigmoid
+                y_pred = y_pred.squeeze(1)
                 labels = labels.squeeze(2)
 
                 # preds.append(y_pred[0].numpy())
@@ -278,7 +290,6 @@ def test_model(testloader, training_config, custom_model_config):
                 
                 for metric_name in aux_metrics.keys():
                     val_aux_metrics[metric_name] += aux_metrics[metric_name](y_pred, labels)
-                
             else:
                 preds.append(y_pred.cpu().numpy()[0, 0, 0])  
                 if torch.all(labels == -1):
@@ -296,6 +307,10 @@ def test_model(testloader, training_config, custom_model_config):
         preds = np.stack(preds, axis=0)
         print(preds.shape)
         np.save(os.path.join(work_dir_path, 'preds.npy'), preds)
+        labels_stack = np.stack(labels_stack, axis=0)
+        print(labels_stack.shape)
+        np.save(os.path.join(work_dir_path, 'labels_patches.npy'), labels_stack)
+        del labels_stack
         # preds_def = np.stack(preds_def, axis=0)
         # print(preds_def.shape)
         print("======== Test Metrics ========")

@@ -10,10 +10,6 @@ def CM(true, pred, num_classes=2):
     for i in range(num_classes):
         for j in range(num_classes):
             confusion_matrix[i, j] = np.sum((true == i) & (pred == j))
-    # TP = confusion_matrix[0, 0]
-    # FP = confusion_matrix[1, 0]
-    # FN = confusion_matrix[0, 1]
-    # TN = confusion_matrix[1, 1]
     return confusion_matrix
 
 def confusion_matrix(true, pred, num_classes=2):
@@ -127,17 +123,18 @@ def compute_roc(thresholds, img_predicted, img_labels):
 
     return prec, recall, tpr, fpr
 
-def precision_recall_curve(thresholds, y_true, y_proba):
-    # thresholds = np.unique(y_proba)
-    # thresholds = np.append(thresholds, thresholds.max() + 1)  # Add a threshold higher than the maximum
-
+def precision_recall_curve(thresholds, y_true, y_prob):
     precision_values = []
-    recall_values = []
-
+    recall_values = []  
+    # print('DEBUG')
+    # print(y_prob.shape)
     for threshold in tqdm(thresholds, desc='PrecisionxRecall'):
-        y_pred = (y_proba >= threshold).astype(int)
-        # precision = Precision(y_pred, y_true)
-        # recall = Recall(y_pred, y_true)
+        # y_pred = (y_prob >= threshold).astype(int)
+        y_pred = y_prob.copy()
+        y_pred[y_pred >= threshold] = 1
+        y_pred[y_pred < threshold] = 0
+        # print(y_pred.shape)
+
         cm, TP, FP, FN, TN = confusion_matrix(y_true, y_pred)
         precision = TN/(TN+FN + 1e-10)
         recall = TN/(TN+FP + 1e-10)
@@ -147,3 +144,15 @@ def precision_recall_curve(thresholds, y_true, y_proba):
         recall_values.append(recall)
 
     return np.array(precision_values), np.array(recall_values), thresholds
+
+if __name__ == '__main__':
+    y_preds = np.load('work_dirs/exp02/preds.npy')[:, 1]
+    print(y_preds.shape)
+    y_trues = np.load('work_dirs/exp02/labels_patches.npy')
+    
+    thresholds = np.arange(0, 1, 0.01)
+    # print(thresholds)
+    # print(thresholds.shape)
+    prec, recall, th = precision_recall_curve(thresholds, y_trues, y_preds)
+    
+    

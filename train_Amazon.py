@@ -17,11 +17,14 @@ import argparse
 parser = argparse.ArgumentParser(description='Amazon Deforestation Prediction')
 parser.add_argument('--root_dir', type=str,\
     default='/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE', help='Root directory for the dataset')
+parser.add_argument('--epochs', type=int, default=100, help='Number of epochs for the training')
 parser.add_argument('--batch_size', type=int, default=16, help='Batch size for the dataset')
 parser.add_argument('-lr', '--learning_rate', type=float, default=1e-3, help='Learning rate to be used in the training')
 parser.add_argument('--patch_size', type=int, default=128, help='Patch size for the dataset')
 parser.add_argument('--overlap', type=float, default=0.15, help='Overlap for the patches')
-parser.add_argument('--window_size', type=int, default=6, help='Window size for the patch series. This includes the predict horizon')
+# parser.add_argument('--window_size', type=int, default=6, help='Window size for the patch series. This includes the predict horizon')
+parser.add_argument('--past_window', type=int, default=4, help='Past window for the patch series')
+parser.add_argument('--predict_horizon', type=int, default=2, help='Predict horizon for the patch series')
 parser.add_argument('--min_def', type=float, default=0.005, help='Minimum deforestation value for the dataset')
 parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for data loading')
 parser.add_argument('--debug', action='store_true', help='Enable or disable debug mode')
@@ -47,7 +50,7 @@ pixel_size = args.pixel_size
 
 patch_size = args.patch_size
 overlap = args.overlap
-window_size = args.window_size
+window_size = args.past_window + args.predict_horizon
 min_def = args.min_def
 normalize = args.not_normalize
 
@@ -92,18 +95,18 @@ dataloader_val = torch.utils.data.DataLoader(
     
 # Exp17 training with categories 2 in input
 custom_training_config = {
-    'pre_seq_length': 4,
-    'aft_seq_length': 2,
-    'total_length': 6,
+    'pre_seq_length': args.past_window,
+    'aft_seq_length': args.predict_horizon,
+    'total_length': window_size,
     'batch_size': batch_size,
     'val_batch_size': batch_size,
-    'epoch': 100,
+    'epoch': args.epochs,
     'lr': args.learning_rate,
     # 'metrics': ['mse', 'mae', 'acc', 'Recall', 'Precision', 'f1_score', 'CM'],
     'metrics': ['mse', 'mae'],
 
     'ex_name': args.exp_name, # custom_exp
-    'in_shape': [4, 1, height, width], # T, C, H, W = self.args.in_shape
+    'in_shape': [args.past_window, 1, height, width], # T, C, H, W = self.args.in_shape
     'patience': 10,
     'delta': 0.0001,
     'amazon_mask': True,
@@ -136,15 +139,15 @@ custom_model_config = {
     'hid_S': args.hid_S, # default: 64
     'hid_T': args.hid_T, # default: 256,
     'classification': True,
-    'num_classes': 2
+    'num_classes': 1
 }
 
-# exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
+exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
 
 mean_std = np.stack((train_set.mean, train_set.std))
 np.save(os.path.join('work_dirs', custom_training_config['ex_name'], 'mean_std.npy'), mean_std)
 
-# exp.train()
+exp.train()
 
 #TODO: pass test patches to the experiment
 if pixel_size == '25K':
