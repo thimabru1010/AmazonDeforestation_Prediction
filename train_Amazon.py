@@ -177,7 +177,7 @@ np.save(os.path.join(work_dir_path, 'preds_reconstructed.npy'), preds_reconstruc
 del preds_reconstructed
 
 print('Reconstructing def preds....')
-preds_def = preds[:, 1]
+preds_def = preds[:, 0]
 
 def_preds_reconstructed = reconstruct_time_patches(preds_def, patch_size=patch_size, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
 print('Def Preds reconstructed')
