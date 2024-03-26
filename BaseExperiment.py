@@ -134,7 +134,7 @@ class BaseExperiment():
                 # mae = self.mae(y_pred, labels.to(self.device))
                 # y_pred = F.softmax(y_pred, dim=1)
                 # y_pred = torch.argmax(y_pred, dim=1)
-                y_pred = F.sigmoid(y_pred, dim=1)
+                y_pred = F.sigmoid(y_pred)
                 y_pred[y_pred >= 0.5] = 1
                 y_pred[y_pred < 0.5] = 0
                 labels = labels.squeeze(2)
@@ -264,7 +264,7 @@ def test_model(testloader, training_config, custom_model_config):
                 labels = labels.cpu()
                 
                 # y_pred = F.softmax(y_pred, dim=1)
-                y_pred = F.sigmoid(y_pred, dim=1)
+                y_pred = F.sigmoid(y_pred)
                 # print(y_pred.shape)
                 preds.append(y_pred[0].numpy())
                 labels_stack.append(labels.numpy())
