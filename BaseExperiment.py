@@ -137,6 +137,7 @@ class BaseExperiment():
                 y_pred = F.sigmoid(y_pred)
                 y_pred[y_pred >= 0.5] = 1
                 y_pred[y_pred < 0.5] = 0
+                y_pred = y_pred.squeeze(1)
                 labels = labels.squeeze(2)
                 # print(y_pred.shape, labels.shape)
                 y_pred = y_pred[labels != -1].cpu().numpy()
