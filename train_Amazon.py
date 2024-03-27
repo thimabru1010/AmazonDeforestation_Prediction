@@ -146,7 +146,7 @@ exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, cust
 
 mean_std = np.stack((train_set.mean, train_set.std))
 np.save(os.path.join('work_dirs', custom_training_config['ex_name'], 'mean_std.npy'), mean_std)
-
+print('Mean: ', train_set.mean, 'Std: ', train_set.std)
 exp.train()
 
 #TODO: pass test patches to the experiment
