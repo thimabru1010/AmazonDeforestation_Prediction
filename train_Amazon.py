@@ -41,6 +41,7 @@ parser.add_argument('-optm', '--optmizer', type=str, default='adam', choices=['a
 parser.add_argument('--sgd_momentum', type=float, default=0.9, help='SGD momemtum. Only applicable if optmizer is sgd')
 parser.add_argument('--focal_gamma', type=float, default=4.5, help='Focal loss gamma hyperparameter')
 parser.add_argument('--focal_alpha', type=float, default=None, help='Focal loss alpha hyperparameter')
+parser.add_argument('--translator', type=str, default='gsta', help='Translator model type')
 args = parser.parse_args()
 
 batch_size = args.batch_size
