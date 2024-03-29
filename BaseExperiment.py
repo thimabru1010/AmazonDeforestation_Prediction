@@ -33,6 +33,8 @@ class BaseExperiment():
         
         print('Input shape:', in_shape)
         torch.manual_seed(seed)
+        # self.model = TimeSformer(img_size=in_shape[2], num_classes=1, num_frames=in_shape[0], attention_type='divided_space_time')
+        
         self.model = self._build_model(in_shape, custom_model_config['num_classes'], custom_model_config)
         
         self.aux_metrics = {}
@@ -63,7 +65,7 @@ class BaseExperiment():
             # TODO: add auxiliary metrics
             self.mae = WMAELoss(weight=1)
         
-        print(summary(self.model, tuple(in_shape)))
+        # print(summary(self.model, tuple(in_shape)))
         
         if training_config['optmizer'] == 'adam':
             self.optm = optm.Adam(self.model.parameters(), lr=training_config['lr'])

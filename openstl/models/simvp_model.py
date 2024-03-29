@@ -7,6 +7,9 @@ from openstl.modules import (ConvSC, ConvNeXtSubBlock, ConvMixerSubBlock, GASubB
 
 import torch.nn.functional as F
 
+from openstl.TimeSformer.timesformer.models.vit import TimeSformer
+# import TimeSformer.timesformer.models.vit as vit
+
 class SimVP_Model(nn.Module):
     r"""SimVP Model
 
@@ -34,6 +37,9 @@ class SimVP_Model(nn.Module):
         model_type = 'gsta' if model_type is None else model_type.lower()
         if model_type == 'incepu':
             self.hid = MidIncepNet(T*hid_S, hid_T, N_T)
+        elif model_type == 'timesformer':
+            # print(H)
+            self.hid = TimeSformer(img_size=H, patch_size=16, num_classes=1, num_frames=T, attention_type='divided_space_time')
         else:
             self.hid = MidMetaNet(T*hid_S, hid_T, N_T,
                 input_resolution=(H, W), model_type=model_type,
@@ -41,13 +47,19 @@ class SimVP_Model(nn.Module):
 
     def forward(self, x_raw, **kwargs):
         B, T, C, H, W = x_raw.shape
+        print('DEBUG FORWARD')
+        print(B, T, C, H, W)
         x = x_raw.view(B*T, C, H, W)
 
         embed, skip = self.enc(x)
         _, C_, H_, W_ = embed.shape
 
-        z = embed.view(B, T, C_, H_, W_)
+        # z = embed.view(B, T, C_, H_, W_)
+        z = embed.view(B, C_, T, H_, W_) # Needed for timesformer
+        print('DEBUG MID')
+        print(z.shape)
         hid = self.hid(z)
+        print(hid.shape) # torch.Size([16, 4, 32, 16, 16])
         hid = hid.reshape(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)
@@ -56,10 +68,6 @@ class SimVP_Model(nn.Module):
         # print(B, T, C, H, W)
         # print(Y.shape)
         Y = Y.reshape(B, T, -1, H, W)
-        # print(Y.shape)
-        # 1/0
-        # Y = Y.reshape(B, T, C, H, W)
-        # print(Y.shape)
         return Y
 
 

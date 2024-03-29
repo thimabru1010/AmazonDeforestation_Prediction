@@ -133,7 +133,7 @@ custom_model_config = {
     # 'config_file': 'configs/custom/example_model.py',
     
     # Here, we directly set these parameters
-    'model_type': 'gSTA',
+    'model_type': 'timesformer',
     'N_S': args.N_S,
     'N_T': args.N_T,
     'hid_S': args.hid_S, # default: 64
