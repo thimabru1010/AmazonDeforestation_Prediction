@@ -519,7 +519,8 @@ class IbamaDETER1km_Dataset(Dataset):
             
         self.normalize = normalize
         self.transform = transform
-        self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7,7))
+        self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10,10))
+        self.mode = mode
     
     def get_validation_set(self):
         return self.val_files, self.mask_val_files
@@ -548,9 +549,9 @@ class IbamaDETER1km_Dataset(Dataset):
         # labels[:, mask == 0] = -1
         labels[labels > 0] = 1
         
-        # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
-        data = cv2.dilate(data.astype(np.uint8), self.kernel, iterations=3).astype(np.float32)
-        labels = cv2.dilate(labels.astype(np.uint8), self.kernel, iterations=3).astype(np.float32)
+        if self.mode == 'train':
+            data = cv2.dilate(data.astype(np.uint8), self.kernel, iterations=4).astype(np.float32)
+            labels = cv2.dilate(labels.astype(np.uint8), self.kernel, iterations=4).astype(np.float32)
         labels[:, mask == 0] = -1          
         
         # print(data.shape, labels.shape)
