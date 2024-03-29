@@ -549,8 +549,8 @@ class IbamaDETER1km_Dataset(Dataset):
         labels[labels > 0] = 1
         
         # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
-        data = cv2.dilate(data, self.kernel, iterations=1)
-        labels = cv2.dilate(labels, self.kernel, iterations=1)
+        data = cv2.dilate(data.astype(np.uint8), self.kernel, iterations=1).astype(np.float32)
+        labels = cv2.dilate(labels.astype(np.uint8), self.kernel, iterations=1).astype(np.float32)
         labels[:, mask == 0] = -1          
         
         # print(data.shape, labels.shape)
