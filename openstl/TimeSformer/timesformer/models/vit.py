@@ -212,7 +212,7 @@ class VisionTransformer(nn.Module):
         # Classifier head
         # self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
         # img_size_out = img_size // 4
-        self.head = nn.Linear(embed_dim, 4*32*img_size*img_size)
+        self.head = nn.Linear(embed_dim, num_frames*32*img_size*img_size)
 
         trunc_normal_(self.pos_embed, std=.02)
         trunc_normal_(self.cls_token, std=.02)
