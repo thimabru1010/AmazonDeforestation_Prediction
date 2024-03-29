@@ -39,7 +39,7 @@ class SimVP_Model(nn.Module):
             self.hid = MidIncepNet(T*hid_S, hid_T, N_T)
         elif model_type == 'timesformer':
             # print(H)
-            self.hid = TimeSformer(img_size=H, patch_size=16, num_classes=1, num_frames=T, attention_type='divided_space_time')
+            self.hid = TimeSformer(img_size=H, num_classes=1, num_frames=T, attention_type='divided_space_time')
         else:
             self.hid = MidMetaNet(T*hid_S, hid_T, N_T,
                 input_resolution=(H, W), model_type=model_type,
@@ -47,8 +47,8 @@ class SimVP_Model(nn.Module):
 
     def forward(self, x_raw, **kwargs):
         B, T, C, H, W = x_raw.shape
-        print('DEBUG FORWARD')
-        print(B, T, C, H, W)
+        # print('DEBUG FORWARD')
+        # print(B, T, C, H, W)
         x = x_raw.view(B*T, C, H, W)
 
         embed, skip = self.enc(x)
@@ -56,10 +56,11 @@ class SimVP_Model(nn.Module):
 
         # z = embed.view(B, T, C_, H_, W_)
         z = embed.view(B, C_, T, H_, W_) # Needed for timesformer
-        print('DEBUG MID')
-        print(z.shape)
+        # print('DEBUG MID')
+        # print(z.shape)
         hid = self.hid(z)
-        print(hid.shape) # torch.Size([16, 4, 32, 16, 16])
+        # print(hid.shape) # torch.Size([16, 4, 32, 16, 16])
+        # print(hid.reshape(B, -1).shape)
         hid = hid.reshape(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)

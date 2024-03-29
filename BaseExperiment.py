@@ -66,6 +66,7 @@ class BaseExperiment():
             self.mae = WMAELoss(weight=1)
         
         # print(summary(self.model, tuple(in_shape)))
+        print(self.model)
         
         if training_config['optmizer'] == 'adam':
             self.optm = optm.Adam(self.model.parameters(), lr=training_config['lr'])
