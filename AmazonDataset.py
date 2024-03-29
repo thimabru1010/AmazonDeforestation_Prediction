@@ -12,6 +12,7 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from sklearn.model_selection import train_test_split
 from datetime import datetime
+import cv2
 
 try:
     from osgeo import gdal
@@ -518,6 +519,7 @@ class IbamaDETER1km_Dataset(Dataset):
             
         self.normalize = normalize
         self.transform = transform
+        self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
     
     def get_validation_set(self):
         return self.val_files, self.mask_val_files
@@ -543,8 +545,13 @@ class IbamaDETER1km_Dataset(Dataset):
         data[data > 0] = 1 # Make every deforestation area to 1
         # data[data == -1] = 0
         # Negative values will be filtered in the cost function
-        labels[:, mask == 0] = -1
+        # labels[:, mask == 0] = -1
         labels[labels > 0] = 1
+        
+        # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
+        data = cv2.dilate(data, self.kernel, iterations=1)
+        labels = cv2.dilate(labels, self.kernel, iterations=1)
+        labels[:, mask == 0] = -1          
         
         # print(data.shape, labels.shape)
         # print(self.mean.shape, self.std.shape)
