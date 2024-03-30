@@ -220,10 +220,10 @@ class GASubBlock(nn.Module):
     def forward(self, x):
         x = x + self.drop_path(
             self.layer_scale_1.unsqueeze(-1).unsqueeze(-1) * self.attn(self.norm1(x)))
-        print('GASubBlock: x.shape', x.shape)
+        # print('GASubBlock: x.shape', x.shape)
         x = x + self.drop_path(
             self.layer_scale_2.unsqueeze(-1).unsqueeze(-1) * self.mlp(self.norm2(x)))
-        print(x.shape)
+        # print(x.shape)
         return x
 
 
