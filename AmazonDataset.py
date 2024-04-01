@@ -13,6 +13,7 @@ from albumentations.pytorch import ToTensorV2
 from sklearn.model_selection import train_test_split
 from datetime import datetime
 import cv2
+from skimage.measure import block_reduce
 
 try:
     from osgeo import gdal
@@ -451,6 +452,11 @@ class IbamaDETER1km_Dataset(Dataset):
             # mask = load_tif_image('data/IBAMA_INPE/1K/tiff_filled/mask.tif')
             mask = load_npy_image('data/IBAMA_INPE/1K/tiff_filled/mask.npy')
             mask = mask[:deter_img.shape[1], :deter_img.shape[2]]
+            
+            for i in range(deter_img.shape[0]):
+                deter_img[i] = block_reduce(deter_img[i], (2, 2), np.sum)
+                
+            mask = block_reduce(mask, (2, 2), np.sum)                
             
             deter_img[:, mask == 0] = -1
             deter_img[deter_img > 0] = 1
