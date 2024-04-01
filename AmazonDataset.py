@@ -480,6 +480,7 @@ class IbamaDETER1km_Dataset(Dataset):
             del deter_img_val
             # test_patches = preprocess_patches(deter_img_test, patch_size=patch_size, overlap=0)
             test_patches = extract_temporal_sorted_patches(deter_img_test, patch_size)
+            test_patches = test_patches.transpose(1, 0, 2, 3)
             print('Test Patches:', test_patches.shape)
             del deter_img_test
             
