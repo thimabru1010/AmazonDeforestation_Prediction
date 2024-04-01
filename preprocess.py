@@ -120,12 +120,7 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6,
                 else:
                     _label = label[label != -1]
                     # _label = np.logical_not(_label)
-                    _label = 1 - _label
-                    # sum_label = np.sum(_label)
-                    # # print(_label.shape)
-                    # total_pixels = _label.shape[0]# * _label.shape[1] * _label.shape[2]
-                    # sum_label = total_pixels - sum_label
-                    # mean = sum_label / total_pixels
+                    # _label = 1 - _label
                     mean = np.mean(_label)
                 
                 # mean = np.mean(_label, axis=(0, 1))
