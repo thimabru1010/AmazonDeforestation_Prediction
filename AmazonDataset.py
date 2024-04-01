@@ -461,7 +461,7 @@ class IbamaDETER1km_Dataset(Dataset):
             # mask = block_reduce(mask, (2, 2), np.sum)                
             
             deter_img[deter_img > 0] = 1
-            deter_img = np.logical_not(deter_img)
+            # deter_img = np.logical_not(deter_img)
             # deter_img = 1 - deter_img
             deter_img[:, mask == 0] = -1
             # xcut = (deter_img.shape[1] // patch_size) * patch_size
@@ -555,7 +555,7 @@ class IbamaDETER1km_Dataset(Dataset):
         
         patch_window_cpy = patch_window.copy()
         patch_window[patch_window_cpy == -1] = 0
-        patch_window = np.logical_not(patch_window)
+        # patch_window = np.logical_not(patch_window)
         # patch_window = 1 - patch_window
         
         
@@ -568,7 +568,7 @@ class IbamaDETER1km_Dataset(Dataset):
                     # labels = cv2.dilate(labels, self.kernel, iterations=1)
         # labels[:, mask == 0] = -1          
         
-        patch_window = np.logical_not(patch_window)
+        # patch_window = np.logical_not(patch_window)
         # patch_window = 1 - patch_window
         patch_window[patch_window_cpy == -1] = -1
         
