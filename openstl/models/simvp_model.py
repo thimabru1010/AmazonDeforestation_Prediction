@@ -47,9 +47,9 @@ class SimVP_Model(nn.Module):
         
         # mid_emb_size = H * W * T * 32 * batch_size
         # self.mid_mlp = nn.Linear(T*hid_S, 1)
-        self.mid_mlp = nn.Sequential(nn.Linear(768, 384),
+        self.mid_mlp = nn.Sequential(nn.Linear(768, batch_size*768),
                                      nn.ReLU(),
-                                     nn.Linear(384, 1)
+                                     nn.Linear(batch_size*768, 1)
         )
 
     def forward(self, x_raw, **kwargs):
@@ -77,6 +77,7 @@ class SimVP_Model(nn.Module):
         # print(B, T, C, H, W)
         # print(Y.shape)
         Y = Y.reshape(B, T, -1, H, W)
+        Y_mid = Y_mid.reshape(B, -1)
         return Y, Y_mid
 
 
