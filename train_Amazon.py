@@ -145,12 +145,12 @@ custom_model_config = {
     'num_classes': 1
 }
 
-exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
+# exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
 
 mean_std = np.stack((train_set.mean, train_set.std))
 np.save(os.path.join('work_dirs', custom_training_config['ex_name'], 'mean_std.npy'), mean_std)
 print('Mean: ', train_set.mean, 'Std: ', train_set.std)
-exp.train()
+# exp.train()
 
 #TODO: pass test patches to the experiment
 if pixel_size == '25K':
@@ -158,8 +158,8 @@ if pixel_size == '25K':
     test_set = IbamaInpe25km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data, means=[train_set.mean, train_set.mean_for, train_set.mean_clouds], stds=[train_set.std, train_set.std_for, train_set.std_clouds])
 elif pixel_size == '1K':
     test_data, mask_test_data = train_set.get_test_set()
-    print(len(test_data), len(mask_test_data))
-    print(test_data.shape, mask_test_data.shape)
+    # print(len(test_data), len(mask_test_data))
+    print(test_data.shape)
     test_set = IbamaDETER1km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data,\
         mask_val_data=mask_test_data, means=[train_set.mean], stds=[train_set.std])
 
