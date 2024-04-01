@@ -109,7 +109,8 @@ class BaseExperiment():
             y_pred = torch.transpose(y_pred, 1, 2)
             labels = labels.type(torch.LongTensor)
             
-            # print(mid_pred.shape, def_area.shape)
+            print(mid_pred[:, 0].shape, def_area.shape)
+            print(mid_pred[:, 0], def_area)
             
             area_reg = self.mse(mid_pred[:, 0], def_area.to(self.device))
             # area_reg.backward()
