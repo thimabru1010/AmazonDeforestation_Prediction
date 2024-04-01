@@ -567,6 +567,9 @@ class IbamaDETER1km_Dataset(Dataset):
         data = patch_window[:-2]
         labels = patch_window[-2:]
         
+        # Avoid negative values for the input
+        data[data < 0] = 0
+        
         if self.normalize:
             data = data - self.mean / self.std
             
