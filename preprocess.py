@@ -98,6 +98,7 @@ def reconstruct_time_patches(preds: np.ndarray, patch_size: int=64, time_idx: in
     return np.stack(images_reconstructed, axis=0)
 
 def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6, pred_horizon: int=2, mask_patches: np.ndarray=None) -> np.ndarray:
+    # Patches should be in shape (n_patches, n_time, h, w)
     skipped_count = 0
     # if mask_patches is not None:
     windowed_mask_patches = []
@@ -112,8 +113,13 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6,
                 windowed_patch = patch[j:j+window_size]
                 label = windowed_patch[-pred_horizon:]
                 # print(label.shape)
-                _label = label[:, mask_patches[i] == 1]
-                mean = np.mean(_label, axis=(0, 1))
+                if mask_patches is not None:
+                    _label = label[:, mask_patches[i] == 1]
+                    mean = np.mean(_label, axis=(0, 1))
+                else:
+                    _label = label[label != -1]
+                    mean = np.mean(_label)
+                # mean = np.mean(_label, axis=(0, 1))
                 # Deal with Nan
                 if np.isnan(mean): mean = 0
                 if mean < 0: mean = 0

@@ -138,8 +138,7 @@ def precision_recall_curve(thresholds, y_true, y_prob):
         cm, TP, FP, FN, TN = confusion_matrix(y_true, y_pred)
         precision = TN/(TN+FN + 1e-10)
         recall = TN/(TN+FP + 1e-10)
-        # f1_clss1 = 2 * prec * rec / (prec + rec + 1e-10)
-        # precision, recall, _ = calculate_metrics(y_true, y_pred)
+
         precision_values.append(precision)
         recall_values.append(recall)
 

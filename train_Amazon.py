@@ -42,6 +42,7 @@ parser.add_argument('--sgd_momentum', type=float, default=0.9, help='SGD momemtu
 parser.add_argument('--focal_gamma', type=float, default=4.5, help='Focal loss gamma hyperparameter')
 parser.add_argument('--focal_alpha', type=float, default=None, help='Focal loss alpha hyperparameter')
 parser.add_argument('--translator', type=str, default='gsta', help='Translator model type')
+parser.add_argument('--dilation_size', type=int, default=-1, help='Filter size to apply to dilation')
 args = parser.parse_args()
 
 batch_size = args.batch_size
@@ -80,10 +81,10 @@ if pixel_size == '25K':
     height = 98
 elif pixel_size == '1K':
     train_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalize=normalize, Debug=Debug, transform=transform,\
-        patch_size=patch_size, overlap=overlap, min_def=min_def, window_size=window_size)
+        patch_size=patch_size, overlap=overlap, min_def=min_def, window_size=window_size, dilation_size=args.dilation_size)
     val_data, mask_val_data = train_set.get_validation_set()
     val_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalize=normalize, Debug=Debug, mode='val', patch_size=patch_size,\
-        val_data=val_data, mask_val_data=mask_val_data, means=[train_set.mean], stds=[train_set.std])
+        val_data=val_data, mask_val_data=mask_val_data, means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size)
     width = patch_size
     height = patch_size
 
@@ -123,7 +124,8 @@ custom_training_config = {
     'optmizer': args.optmizer,
     'sgd_momentum': args.sgd_momentum,
     'focal_gamma': args.focal_gamma,
-    'focal_alpha': args.focal_alpha
+    'focal_alpha': args.focal_alpha,
+    'dilation_size': args.dilation_size
 }
 
 custom_model_config = {

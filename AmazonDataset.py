@@ -439,7 +439,7 @@ class IbamaInpe25km_Dataset(Dataset):
 class IbamaDETER1km_Dataset(Dataset):
     def __init__(self, root_dir: Path, normalize: bool=True, transform: torchvision.transforms=None,
                 Debug: bool=False, mode: str='train', patch_size=64, overlap=0.1, min_def=0.02, window_size=6,\
-                    val_data=None, mask_val_data=None, means=None, stds=None):
+                    val_data=None, mask_val_data=None, means=None, stds=None, dilation_size=-1):
         super(IbamaDETER1km_Dataset, self).__init__()
         self.root_dir = root_dir
         ibama_folder_path = root_dir / 'tiff_filled'
@@ -452,7 +452,7 @@ class IbamaDETER1km_Dataset(Dataset):
             mask = load_npy_image('data/IBAMA_INPE/1K/tiff_filled/mask.npy')
             mask = mask[:deter_img.shape[1], :deter_img.shape[2]]
             
-            # deter_img[:, mask == 0] = -1
+            deter_img[:, mask == 0] = -1
             deter_img[deter_img > 0] = 1
             # xcut = (deter_img.shape[1] // patch_size) * patch_size
             # ycut = (deter_img.shape[2] // patch_size) * patch_size
@@ -483,29 +483,31 @@ class IbamaDETER1km_Dataset(Dataset):
             print('Test Patches:', test_patches.shape)
             del deter_img_test
             
-            mask_train_patches = preprocess_patches(mask, patch_size=patch_size, overlap=overlap)
-            print('Mask Train Patches:', mask_train_patches.shape)
-            mask_val_patches = preprocess_patches(mask, patch_size=patch_size, overlap=0)
-            print('Mask Validation Patches:', mask_val_patches.shape)
-            # mask_test_patches = preprocess_patches(mask, patch_size=patch_size, overlap=0)
-            mask_test_patches = extract_sorted_patches(mask, patch_size)
-            print('Mask Test Patches:', mask_test_patches.shape)
+            # mask_train_patches = preprocess_patches(mask, patch_size=patch_size, overlap=overlap)
+            # print('Mask Train Patches:', mask_train_patches.shape)
+            # mask_val_patches = preprocess_patches(mask, patch_size=patch_size, overlap=0)
+            # print('Mask Validation Patches:', mask_val_patches.shape)
+            # # mask_test_patches = preprocess_patches(mask, patch_size=patch_size, overlap=0)
+            # mask_test_patches = extract_sorted_patches(mask, patch_size)
+            # print('Mask Test Patches:', mask_test_patches.shape)
             
             
             # self.data_files = train_patches
             # self.val_files = val_patches
-            self.data_files, self.mask_files, _ = divide_pred_windows(train_patches, min_def=min_def, window_size=window_size,\
-                mask_patches=mask_train_patches)
-            print(f'Training shape: {self.data_files.shape} - {self.mask_files.shape}')
+            self.data_files, self.mask_files, _ = divide_pred_windows(train_patches, min_def=min_def, window_size=window_size)
+            # print(f'Training shape: {self.data_files.shape} - {self.mask_files.shape}')
+            print(f'Training shape: {self.data_files.shape}')
             
             # Only using min_def != 0 to speed training. Validation should not use this
-            self.val_files, self.mask_val_files, _ = divide_pred_windows(val_patches, min_def=min_def/100, window_size=window_size,\
-                mask_patches=mask_val_patches)
-            print(f'Validation shape: {self.val_files.shape} - {self.mask_val_files.shape}')
+            self.val_files, self.mask_val_files, _ = divide_pred_windows(val_patches, min_def=min_def/100,\
+                window_size=window_size)
+            # print(f'Validation shape: {self.val_files.shape} - {self.mask_val_files.shape}')
+            print(f'Validation shape: {self.val_files.shape}')
             
-            self.test_files, self.mask_test_files, _ = divide_pred_windows(test_patches, min_def=0, window_size=window_size,\
-                mask_patches=mask_test_patches)
-            print(f'Test shape: {self.test_files.shape} - {self.mask_test_files.shape}')
+            self.test_files, self.mask_test_files, _ = divide_pred_windows(test_patches, min_def=0,\
+                window_size=window_size)
+            # print(f'Test shape: {self.test_files.shape} - {self.mask_test_files.shape}')
+            print(f'Test shape: {self.test_files.shape}')
             
             
         else:
@@ -519,7 +521,10 @@ class IbamaDETER1km_Dataset(Dataset):
             
         self.normalize = normalize
         self.transform = transform
-        self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10,10))
+        if dilation_size == -1:
+            self.kernel = None
+        else:
+            self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilation_size, dilation_size))
         self.mode = mode
     
     def get_validation_set(self):
@@ -535,32 +540,34 @@ class IbamaDETER1km_Dataset(Dataset):
         # print(self.root_dir / self.data_files[index])
         patch_window = self.data_files[index]
         # print(patch_window.shape)
-        mask = self.mask_files[index]
+        # mask = self.mask_files[index]
+        
+        # data = patch_window[:-2]
+        # labels = patch_window[-2:]
+        
+        # Apply Legal Amazon Mask
+        # No negative values should be present in input data
+        # data[:, mask == 0] = 0
+        # data[data > 0] = 1 # Make every deforestation area to 1
+        # data[data == -1] = 0
+        # Negative values will be filtered in the cost function
+        # labels[:, mask == 0] = -1
+        # labels[labels > 0] = 1
+        
+        if self.mode == 'train' and self.kernel is not None:
+            for i in range(patch_window.shape[0]):
+                patches_sum = patch_window[i]
+                patches_sum = patches_sum[patches_sum != -1]
+                if np.sum(patches_sum) > 0:
+                    patch_window[i] = cv2.dilate(patch_window[i], self.kernel, iterations=1)
+                    # labels = cv2.dilate(labels, self.kernel, iterations=1)
+        # labels[:, mask == 0] = -1          
         
         data = patch_window[:-2]
         labels = patch_window[-2:]
         
-        # Apply Legal Amazon Mask
-        # No negative values should be present in input data
-        data[:, mask == 0] = 0
-        data[data > 0] = 1 # Make every deforestation area to 1
-        # data[data == -1] = 0
-        # Negative values will be filtered in the cost function
-        # labels[:, mask == 0] = -1
-        labels[labels > 0] = 1
-        
-        if self.mode == 'train':
-            data = cv2.dilate(data.astype(np.uint8), self.kernel, iterations=4).astype(np.float32)
-            labels = cv2.dilate(labels.astype(np.uint8), self.kernel, iterations=4).astype(np.float32)
-        labels[:, mask == 0] = -1          
-        
-        # print(data.shape, labels.shape)
-        # print(self.mean.shape, self.std.shape)
-        
         if self.normalize:
             data = data - self.mean / self.std
-            
-        # data = np.expand_dims(data, axis=1)
             
         if self.transform:
             # For albumentations the image needs to be in shape (H, W, C)
