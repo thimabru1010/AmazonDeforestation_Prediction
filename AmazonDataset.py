@@ -460,8 +460,9 @@ class IbamaDETER1km_Dataset(Dataset):
             # del new_deter_img
             # mask = block_reduce(mask, (2, 2), np.sum)                
             
-            deter_img[:, mask == 0] = -1
             deter_img[deter_img > 0] = 1
+            deter_img = np.logical_not(deter_img)
+            deter_img[:, mask == 0] = -1
             # xcut = (deter_img.shape[1] // patch_size) * patch_size
             # ycut = (deter_img.shape[2] // patch_size) * patch_size
             # deter_img = deter_img[:, :xcut, :ycut]
@@ -551,17 +552,10 @@ class IbamaDETER1km_Dataset(Dataset):
         # print(patch_window.shape)
         # mask = self.mask_files[index]
         
-        # data = patch_window[:-2]
-        # labels = patch_window[-2:]
+        patch_window_cpy = patch_window.copy()
+        patch_window[patch_window_cpy == -1] = 0
+        patch_window = np.logical_not(patch_window)
         
-        # Apply Legal Amazon Mask
-        # No negative values should be present in input data
-        # data[:, mask == 0] = 0
-        # data[data > 0] = 1 # Make every deforestation area to 1
-        # data[data == -1] = 0
-        # Negative values will be filtered in the cost function
-        # labels[:, mask == 0] = -1
-        # labels[labels > 0] = 1
         
         if self.mode == 'train' and self.kernel is not None:
             for i in range(patch_window.shape[0]):
@@ -571,6 +565,9 @@ class IbamaDETER1km_Dataset(Dataset):
                     patch_window[i] = cv2.dilate(patch_window[i], self.kernel, iterations=1)
                     # labels = cv2.dilate(labels, self.kernel, iterations=1)
         # labels[:, mask == 0] = -1          
+        
+        patch_window = np.logical_not(patch_window)
+        patch_window[patch_window_cpy == -1] = -1
         
         data = patch_window[:-2]
         labels = patch_window[-2:]

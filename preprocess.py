@@ -115,10 +115,17 @@ def divide_pred_windows(patches: np.ndarray, min_def: float, window_size: int=6,
                 # print(label.shape)
                 if mask_patches is not None:
                     _label = label[:, mask_patches[i] == 1]
+                    print(_label.shape)
                     mean = np.mean(_label, axis=(0, 1))
                 else:
                     _label = label[label != -1]
+                    # sum_label = np.sum(_label)
+                    # # print(_label.shape)
+                    # total_pixels = _label.shape[0]# * _label.shape[1] * _label.shape[2]
+                    # sum_label = total_pixels - sum_label
+                    # mean = sum_label / total_pixels
                     mean = np.mean(_label)
+                
                 # mean = np.mean(_label, axis=(0, 1))
                 # Deal with Nan
                 if np.isnan(mean): mean = 0
