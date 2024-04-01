@@ -453,12 +453,12 @@ class IbamaDETER1km_Dataset(Dataset):
             mask = load_npy_image('data/IBAMA_INPE/1K/tiff_filled/mask.npy')
             mask = mask[:deter_img.shape[1], :deter_img.shape[2]]
             
-            new_deter_img = []
-            for i in range(deter_img.shape[0]):
-                new_deter_img.append(block_reduce(deter_img[i], (2, 2), np.sum))
-            deter_img = np.stack(new_deter_img, axis=0)
-            del new_deter_img
-            mask = block_reduce(mask, (2, 2), np.sum)                
+            # new_deter_img = []
+            # for i in range(deter_img.shape[0]):
+            #     new_deter_img.append(block_reduce(deter_img[i], (4, 4), np.sum))
+            # deter_img = np.stack(new_deter_img, axis=0)
+            # del new_deter_img
+            # mask = block_reduce(mask, (2, 2), np.sum)                
             
             deter_img[:, mask == 0] = -1
             deter_img[deter_img > 0] = 1
