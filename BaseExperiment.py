@@ -110,11 +110,13 @@ class BaseExperiment():
             labels = labels.type(torch.LongTensor)
             
             area_reg = self.mse(mid_pred, def_area.to(self.device))
-            area_reg.backward()
+            # area_reg.backward()
             # print(y_pred.shape, labels.shape, labels.squeeze(2).shape)
             # print(y_pred.dtype, labels.squeeze(2).dtype)
             loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
-            loss.backward()
+            total_loss = loss + area_reg
+            total_loss.backward()
+            # loss.backward()
             
             # Adjust learning weights
             self.optm.step()
