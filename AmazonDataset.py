@@ -559,7 +559,7 @@ class IbamaDETER1km_Dataset(Dataset):
             for i in range(patch_window.shape[0]):
                 patches_sum = patch_window[i]
                 patches_sum = patches_sum[patches_sum != -1]
-                if np.sum(patches_sum) > 0 and i not in [4, 5]:
+                if np.sum(patches_sum) > 0 and i not in [0, 1, 2, 3]:
                     patch_window[i] = cv2.dilate(patch_window[i], self.kernel, iterations=1)
                     # labels = cv2.dilate(labels, self.kernel, iterations=1)
         # labels[:, mask == 0] = -1          
