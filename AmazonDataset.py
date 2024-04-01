@@ -577,7 +577,7 @@ class IbamaDETER1km_Dataset(Dataset):
         
         def_area = np.sum(labels[labels != -1])
         def_area = torch.tensor(def_area)
-        def_area = def_area / 8192
+        def_area = def_area / 8192 * 100
         
         # labels[(labels < 1) & (labels > 0)] = 0
         
