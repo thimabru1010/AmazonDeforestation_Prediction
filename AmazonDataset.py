@@ -575,9 +575,11 @@ class IbamaDETER1km_Dataset(Dataset):
         data = patch_window[:-2]
         labels = patch_window[-2:]
         
-        #! Label smoothing
-        # labels[labels == 1] = labels[labels == 1] - 0.1
-        # labels[labels == 0] = labels[labels == 0] + 0.1
+        def_area = np.sum(labels)
+        def_area = torch.tensor(def_area)
+        
+        labels[(labels < 1) & (labels > 0)] = 0
+        
         
         # Avoid negative values for the input
         data[data < 0] = 0
@@ -595,4 +597,4 @@ class IbamaDETER1km_Dataset(Dataset):
             data = torch.tensor(data)
             labels = torch.tensor(labels)
         # print(data.shape, labels.shape)
-        return data.unsqueeze(1).float(), labels.unsqueeze(1).float()
+        return data.unsqueeze(1).float(), labels.unsqueeze(1).float(), def_area.float()

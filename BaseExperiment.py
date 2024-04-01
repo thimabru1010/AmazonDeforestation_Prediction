@@ -35,7 +35,7 @@ class BaseExperiment():
         torch.manual_seed(seed)
         # self.model = TimeSformer(img_size=in_shape[2], num_classes=1, num_frames=in_shape[0], attention_type='divided_space_time')
         
-        self.model = self._build_model(in_shape, custom_model_config['num_classes'], custom_model_config)
+        self.model = self._build_model(in_shape, custom_model_config['num_classes'], custom_model_config, training_config['batch_size'])
         
         self.aux_metrics = {}
         if custom_model_config['num_classes']:
@@ -59,6 +59,8 @@ class BaseExperiment():
                     self.aux_metrics['Precision'] = Precision
                 elif metric == 'CM':
                     self.aux_metrics['CM'] = CM
+                # elif metric == 'MSE':
+                #     self.aux_metrics['MSE'] = nn.MSELoss()
         else:
             self.classification = False
             self.loss = WMSELoss(weight=1)
@@ -81,12 +83,13 @@ class BaseExperiment():
             
         # self.loss = WMSELoss(weight=1)
         # self.mae = WMAELoss(weight=1)
+        self.mse = nn.MSELoss()
         
         self.trainloader = trainloader
         self.valloader = valloader
         
-    def _build_model(self, in_shape, num_classes, custom_model_config):
-        return SimVP_Model(in_shape=in_shape, nclasses=num_classes, **custom_model_config).to(self.device)
+    def _build_model(self, in_shape, num_classes, custom_model_config, batch_size):
+        return SimVP_Model(in_shape=in_shape, nclasses=num_classes, batch_size=batch_size, **custom_model_config).to(self.device)
     
     def _save_json(self, data, filename):
         with open(os.path.join(self.work_dir_path, filename), 'w') as f:
@@ -94,17 +97,20 @@ class BaseExperiment():
             
     def train_one_epoch(self):
         train_loss = 0
+        train_area_reg = 0
         self.model.train(True)
-        for inputs, labels in tqdm(self.trainloader):
+        for inputs, labels, def_area in tqdm(self.trainloader):
             # Zero your gradients for every batch!
             self.optm.zero_grad()
             
-            y_pred = self.model(inputs.to(self.device))
+            y_pred, mid_pred = self.model(inputs.to(self.device))
             # Get only the first temporal channel
             y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
             y_pred = torch.transpose(y_pred, 1, 2)
             labels = labels.type(torch.LongTensor)
             
+            area_reg = self.mse(mid_pred, def_area.to(self.device))
+            area_reg.backward()
             # print(y_pred.shape, labels.shape, labels.squeeze(2).shape)
             # print(y_pred.dtype, labels.squeeze(2).dtype)
             loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
@@ -114,24 +120,29 @@ class BaseExperiment():
             self.optm.step()
             
             train_loss += loss.detach()
+            train_area_reg += area_reg.detach()
+            
         train_loss = train_loss / len(self.trainloader)
+        train_area_reg = train_area_reg / len(self.trainloader)
         
-        return train_loss
+        return train_loss, train_area_reg
 
     def validate_one_epoch(self):
         val_loss = 0
-        val_mae = 0
+        val_area_reg = 0
         val_aux_metrics = dict.fromkeys(self.aux_metrics.keys(), 0)
         self.model.eval()
         # Disable gradient computation and reduce memory consumption.
         with torch.no_grad():
-            for inputs, labels in tqdm(self.valloader):
-                y_pred = self.model(inputs.to(self.device))
+            for inputs, labels, def_area in tqdm(self.valloader):
+                y_pred, mid_pred = self.model(inputs.to(self.device))
                 # Get only the first temporal channel
                 y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
                 # Change B, T, C to B, C, T
                 y_pred = torch.transpose(y_pred, 1, 2)
                 labels = labels.type(torch.LongTensor)
+                
+                area_reg = self.mse(mid_pred, def_area.to(self.device))
                 
                 loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
                 # mae = self.mae(y_pred, labels.to(self.device))
@@ -150,24 +161,24 @@ class BaseExperiment():
                     val_aux_metrics[metric_name] += self.aux_metrics[metric_name](y_pred, labels)
                 
                 val_loss += loss.detach()
-                # val_mae += mae.detach()
+                val_area_reg += area_reg.detach()
             
         val_loss = val_loss / len(self.valloader)
-        val_mae = val_mae / len(self.valloader)
+        val_area_reg = val_area_reg / len(self.valloader)
         for metric_name in self.aux_metrics.keys():
             if metric_name != 'CM':
                 val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / len(self.valloader)
 
-        return val_loss, val_mae, val_aux_metrics
+        return val_loss, val_area_reg, val_aux_metrics
     
     def train(self):
         min_val_loss = float('inf')
         early_stop_counter = 0
         for epoch in range(self.epochs):
             
-            train_loss = self.train_one_epoch()
+            train_loss, train_area_reg = self.train_one_epoch()
             
-            val_loss, val_mae, val_aux_metrics = self.validate_one_epoch()
+            val_loss, val_area_reg, val_aux_metrics = self.validate_one_epoch()
             
             last_lr = self.scheduler.get_last_lr()[0]
             self.scheduler.step()
@@ -183,7 +194,7 @@ class BaseExperiment():
             if early_stop_counter >= self.patience:
                 print(f'Early Stopping! Early Stopping counter: {early_stop_counter}')
                 break
-            terminal_str = f"Epoch {epoch}: LR = {last_lr:.8f} | Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}"
+            terminal_str = f"Epoch {epoch}: LR = {last_lr:.8f} | Train Loss = {train_loss:.6f} | Val Loss = {val_loss:.6f} | Train MSE = {train_area_reg:.6f} | Val MSE = {val_area_reg:.6f}"
             
             cm = val_aux_metrics['CM']
             TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]
@@ -199,21 +210,22 @@ class BaseExperiment():
             
             for metric_name in val_aux_metrics.keys():
                 if metric_name != 'CM':
-                    terminal_str += f" | Validation {metric_name} = {val_aux_metrics[metric_name]:.6f}"
+                    terminal_str += f" | Val {metric_name} = {val_aux_metrics[metric_name]:.6f}"
             print(terminal_str)
             print(val_aux_metrics['CM'])
             # print(f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f}")
             # print(f"Epoch {epoch}: Train Loss = {train_loss:.6f} | Validation Loss = {val_loss:.6f} | Validation MAE = {val_mae:.6f}")
 
-def _build_model(in_shape, nclasses, custom_model_config, device):
-    return SimVP_Model(in_shape=in_shape, nclasses=nclasses, **custom_model_config).to(device)
+def _build_model(in_shape, nclasses, custom_model_config, batch_size, device):
+    return SimVP_Model(in_shape=in_shape, nclasses=nclasses, batch_size=batch_size, **custom_model_config).to(device)
 
 def test_model(testloader, training_config, custom_model_config):
     work_dir_path = os.path.join('work_dirs', training_config['ex_name'])
     device = "cuda:0"
     in_shape = training_config['in_shape']
     
-    model = _build_model(in_shape, custom_model_config['num_classes'], custom_model_config, device)
+    model = _build_model(in_shape, custom_model_config['num_classes'], custom_model_config,\
+        training_config['batch_size'], device)
     # model = _build_model(in_shape, None, custom_model_config, device)
     model.load_state_dict(torch.load(os.path.join(work_dir_path, 'checkpoint.pth')))
     # model.load_state_dict(os.path.join(work_dir_path, 'checkpoint.pth')).to(device)
@@ -251,7 +263,7 @@ def test_model(testloader, training_config, custom_model_config):
     val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
     with torch.no_grad():
         for inputs, labels in tqdm(testloader):
-            y_pred = model(inputs.to(device))
+            y_pred, _ = model(inputs.to(device))
             # Get only the first temporal channel
             y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
             # Change B, T, C to B, C, T

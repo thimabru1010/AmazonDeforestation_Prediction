@@ -20,7 +20,7 @@ class SimVP_Model(nn.Module):
 
     def __init__(self, in_shape, hid_S=16, hid_T=256, N_S=4, N_T=4, model_type='gSTA',
                  mlp_ratio=8., drop=0.0, drop_path=0.0, spatio_kernel_enc=3,
-                 spatio_kernel_dec=3, act_inplace=True, nclasses=None, **kwargs):
+                 spatio_kernel_dec=3, act_inplace=True, nclasses=None, batch_size=32, **kwargs):
         super(SimVP_Model, self).__init__()
         
         T, C, H, W = in_shape  # T is pre_seq_length
@@ -44,10 +44,17 @@ class SimVP_Model(nn.Module):
             self.hid = MidMetaNet(T*hid_S, hid_T, N_T,
                 input_resolution=(H, W), model_type=model_type,
                 mlp_ratio=mlp_ratio, drop=drop, drop_path=drop_path)
+        
+        # mid_emb_size = H * W * T * 32 * batch_size
+        # self.mid_mlp = nn.Linear(T*hid_S, 1)
+        self.mid_mlp = nn.Sequential(nn.Linear(768, 384),
+                                     nn.ReLU(),
+                                     nn.Linear(384, 1)
+        )
 
     def forward(self, x_raw, **kwargs):
         B, T, C, H, W = x_raw.shape
-        # print('DEBUG FORWARD')
+        print('DEBUG FORWARD')
         # print(B, T, C, H, W)
         x = x_raw.view(B*T, C, H, W)
 
@@ -55,12 +62,13 @@ class SimVP_Model(nn.Module):
         _, C_, H_, W_ = embed.shape
 
         # z = embed.view(B, T, C_, H_, W_)
+        # print(B, C_, T, H_, W_)
         z = embed.view(B, C_, T, H_, W_) # Needed for timesformer
         # print('DEBUG MID')
         # print(z.shape)
-        hid = self.hid(z)
-        # print(hid.shape) # torch.Size([16, 4, 32, 16, 16])
-        # print(hid.reshape(B, -1).shape)
+        hid, emb = self.hid(z)
+
+        Y_mid = self.mid_mlp(emb)
         hid = hid.reshape(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)
@@ -69,7 +77,7 @@ class SimVP_Model(nn.Module):
         # print(B, T, C, H, W)
         # print(Y.shape)
         Y = Y.reshape(B, T, -1, H, W)
-        return Y
+        return Y, Y_mid
 
 
 def sampling_generator(N, reverse=False):
