@@ -568,8 +568,8 @@ class IbamaDETER1km_Dataset(Dataset):
         labels = patch_window[-2:]
         
         #! Label smoothing
-        labels[labels == 1] = labels[labels == 1] - 0.1
-        labels[labels == 0] = labels[labels == 0] + 0.1
+        # labels[labels == 1] = labels[labels == 1] - 0.1
+        # labels[labels == 0] = labels[labels == 0] + 0.1
         
         # Avoid negative values for the input
         data[data < 0] = 0
