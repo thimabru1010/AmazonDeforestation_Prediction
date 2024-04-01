@@ -145,12 +145,12 @@ custom_model_config = {
     'num_classes': 1
 }
 
-# exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
+exp = BaseExperiment(dataloader_train, dataloader_val, custom_model_config, custom_training_config)
 
 mean_std = np.stack((train_set.mean, train_set.std))
 np.save(os.path.join('work_dirs', custom_training_config['ex_name'], 'mean_std.npy'), mean_std)
 print('Mean: ', train_set.mean, 'Std: ', train_set.std)
-# exp.train()
+exp.train()
 
 #TODO: pass test patches to the experiment
 if pixel_size == '25K':
@@ -174,7 +174,7 @@ print('Reconstructing patches....')
 print(preds.shape)
 preds_clssf = np.argmax(preds, axis=1)
 print(preds_clssf.shape)
-preds_reconstructed = reconstruct_time_patches(preds_clssf, patch_size=patch_size, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
+preds_reconstructed = reconstruct_time_patches(preds_clssf, patch_size=patch_size, original_img_shape=(2333, 3005), len_patches=1656)
 print('Preds reconstructed')
 np.save(os.path.join(work_dir_path, 'preds_reconstructed.npy'), preds_reconstructed)
 del preds_reconstructed
@@ -182,7 +182,7 @@ del preds_reconstructed
 print('Reconstructing def preds....')
 preds_def = preds[:, 0]
 
-def_preds_reconstructed = reconstruct_time_patches(preds_def, patch_size=patch_size, time_idx=43, original_img_shape=(2333, 3005), len_patches=1656)
+def_preds_reconstructed = reconstruct_time_patches(preds_def, patch_size=patch_size, original_img_shape=(2333, 3005), len_patches=1656)
 print('Def Preds reconstructed')
 np.save(os.path.join(work_dir_path, 'def_preds_reconstructed.npy'), def_preds_reconstructed)
 del def_preds_reconstructed
