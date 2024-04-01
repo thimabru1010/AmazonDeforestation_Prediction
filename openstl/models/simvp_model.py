@@ -54,7 +54,7 @@ class SimVP_Model(nn.Module):
 
     def forward(self, x_raw, **kwargs):
         B, T, C, H, W = x_raw.shape
-        print('DEBUG FORWARD')
+        # print('DEBUG FORWARD')
         # print(B, T, C, H, W)
         x = x_raw.view(B*T, C, H, W)
 
