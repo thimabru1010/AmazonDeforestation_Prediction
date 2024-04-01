@@ -469,8 +469,8 @@ class IbamaDETER1km_Dataset(Dataset):
             deter_img_test = deter_img[(96 + 48):(96 + 48 + 48)]
             del deter_img
             
-            self.mean = deter_img_train.mean()
-            self.std = deter_img_train.std()
+            self.mean = deter_img_train[deter_img_train != -1].mean()
+            self.std = deter_img_train[deter_img_train != -1].std()
             
             train_patches = preprocess_patches(deter_img_train, patch_size=patch_size, overlap=overlap)
             print('Train Patches:', train_patches.shape)
