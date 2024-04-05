@@ -27,7 +27,7 @@ class SimVP_Model(nn.Module):
         T, C, H, W = in_shape  # T is pre_seq_length
         # print(H, W)
         ori_H = H
-        H, W = int(H / 2**(N_S/2)), int(W / 2**(N_S/2))  # downsample 1 / 2**(N_S/2)
+        H, W = int(H / 2**(N_S//2)), int(W / 2**(N_S//2))  # downsample 1 / 2**(N_S//2)
         act_inplace = False
         self.enc = Encoder(C, hid_S, N_S, spatio_kernel_enc, act_inplace=act_inplace)
         #! Alterado
@@ -41,8 +41,7 @@ class SimVP_Model(nn.Module):
         if model_type == 'incepu':
             self.hid = MidIncepNet(T*hid_S, hid_T, N_T)
         elif model_type == 'timesformer':
-            print(ori_H // 2)
-            self.hid = TimeSformer(img_size=ori_H // 2, num_classes=1, num_frames=T, attention_type='divided_space_time')
+            self.hid = TimeSformer(img_size=H, num_classes=1, num_frames=T, attention_type='divided_space_time')
         else:
             self.hid = MidMetaNet(T*hid_S, hid_T, N_T,
                 input_resolution=(H, W), model_type=model_type,
@@ -67,7 +66,7 @@ class SimVP_Model(nn.Module):
         # z = embed.view(B, T, C_, H_, W_)
         # print(B, C_, T, H_, W_)
         z = embed.view(B, C_, T, H_, W_) # Needed for timesformer
-        print(z.shape)
+        # print(z.shape)
         hid = self.hid(z)
         hid = hid.view(B*T, C_, H_, W_)
 
