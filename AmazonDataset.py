@@ -539,6 +539,7 @@ class IbamaDETER1km_Dataset(Dataset):
             self.data_files = self.data_files[:20]
             
         self.predict_horizon = predict_horizon
+        self.past_window = window_size - predict_horizon    
         self.normalize = normalize
         self.transform = transform
         if dilation_size == -1:
@@ -581,8 +582,11 @@ class IbamaDETER1km_Dataset(Dataset):
         # patch_window = 1 - patch_window
         patch_window[patch_window_cpy == -1] = -1
         
-        data = patch_window[:self.predict_horizon]
+        data = patch_window[:self.past_window]
         labels = patch_window[-self.predict_horizon:]
+        
+        # print(data.shape, labels.shape)
+        # 1/0
         
         def_area = np.sum(labels[labels != -1])
         def_area = torch.tensor(def_area)
