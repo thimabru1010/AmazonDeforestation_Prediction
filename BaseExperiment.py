@@ -199,7 +199,7 @@ class BaseExperiment():
             if early_stop_counter >= self.patience:
                 print(f'Early Stopping! Early Stopping counter: {early_stop_counter}')
                 break
-            terminal_str = f"Epoch {epoch}: LR = {last_lr:.8f} | Train Loss = {train_loss:.6f} | Val Loss = {val_loss:.6f} | Train MSE = {train_area_reg:.6f} | Val MSE = {val_area_reg:.6f}"
+            terminal_str = f"Epoch {epoch}: LR = {last_lr:.8f} | Train Loss = {train_loss:.6f} | Val Loss = {val_loss:.6f}"
             
             cm = val_aux_metrics['CM']
             TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]

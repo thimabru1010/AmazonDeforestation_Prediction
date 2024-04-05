@@ -11,9 +11,11 @@ from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime
 import cv2
 from skimage.measure import block_reduce
+
 
 try:
     from osgeo import gdal
@@ -453,6 +455,12 @@ class IbamaDETER1km_Dataset(Dataset):
             mask = load_npy_image('data/IBAMA_INPE/1K/tiff_filled/mask.npy')
             mask = mask[:deter_img.shape[1], :deter_img.shape[2]]
             
+            T, H, W = deter_img.shape
+            min_max_scaler = MinMaxScaler(feature_range=(0, 1))
+            deter_img = min_max_scaler.fit_transform(deter_img.reshape(T, -1)).reshape(T, H, W)
+            print(deter_img.max(), deter_img.min())
+            # 1/0
+            
             # new_deter_img = []
             # for i in range(deter_img.shape[0]):
             #     new_deter_img.append(block_reduce(deter_img[i], (4, 4), np.sum))
@@ -460,7 +468,7 @@ class IbamaDETER1km_Dataset(Dataset):
             # del new_deter_img
             # mask = block_reduce(mask, (2, 2), np.sum)                
             
-            deter_img[deter_img > 0] = 1
+            # deter_img[deter_img > 0] = 1
             # deter_img = np.logical_not(deter_img)
             # deter_img = 1 - deter_img
             deter_img[:, mask == 0] = -1
@@ -585,6 +593,7 @@ class IbamaDETER1km_Dataset(Dataset):
         
         # Avoid negative values for the input
         data[data < 0] = 0
+        labels[labels > 0] = 1
         
         if self.normalize:
             data = data - self.mean / self.std
