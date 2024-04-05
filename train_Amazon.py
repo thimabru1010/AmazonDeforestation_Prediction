@@ -81,10 +81,11 @@ if pixel_size == '25K':
     height = 98
 elif pixel_size == '1K':
     train_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalize=normalize, Debug=Debug, transform=transform,\
-        patch_size=patch_size, overlap=overlap, min_def=min_def, window_size=window_size, dilation_size=args.dilation_size)
+        patch_size=patch_size, overlap=overlap, min_def=min_def, window_size=window_size, predict_horizon=args.predict_horizon,\
+            dilation_size=args.dilation_size)
     val_data, mask_val_data = train_set.get_validation_set()
     val_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalize=normalize, Debug=Debug, mode='val', patch_size=patch_size,\
-        val_data=val_data, mask_val_data=mask_val_data, means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size)
+        val_data=val_data, mask_val_data=mask_val_data, predict_horizon=args.predict_horizon, means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size)
     width = patch_size
     height = patch_size
 

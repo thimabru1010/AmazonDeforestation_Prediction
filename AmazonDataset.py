@@ -442,7 +442,7 @@ class IbamaInpe25km_Dataset(Dataset):
 class IbamaDETER1km_Dataset(Dataset):
     def __init__(self, root_dir: Path, normalize: bool=True, transform: torchvision.transforms=None,
                 Debug: bool=False, mode: str='train', patch_size=64, overlap=0.1, min_def=0.02, window_size=6,\
-                    val_data=None, mask_val_data=None, means=None, stds=None, dilation_size=-1):
+                    predict_horizon=2, val_data=None, mask_val_data=None, means=None, stds=None, dilation_size=-1):
         super(IbamaDETER1km_Dataset, self).__init__()
         self.root_dir = root_dir
         ibama_folder_path = root_dir / 'tiff_filled'
@@ -538,6 +538,7 @@ class IbamaDETER1km_Dataset(Dataset):
         if Debug:
             self.data_files = self.data_files[:20]
             
+        self.predict_horizon = predict_horizon
         self.normalize = normalize
         self.transform = transform
         if dilation_size == -1:
@@ -580,8 +581,8 @@ class IbamaDETER1km_Dataset(Dataset):
         # patch_window = 1 - patch_window
         patch_window[patch_window_cpy == -1] = -1
         
-        data = patch_window[:-2]
-        labels = patch_window[-2:]
+        data = patch_window[:self.predict_horizon]
+        labels = patch_window[-self.predict_horizon:]
         
         def_area = np.sum(labels[labels != -1])
         def_area = torch.tensor(def_area)
