@@ -105,7 +105,7 @@ class BaseExperiment():
             
             y_pred = self.model(inputs.to(self.device))
             # Get only the first temporal channel
-            y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
+            y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
             y_pred = torch.transpose(y_pred, 1, 2)
             labels = labels.type(torch.LongTensor)
             
@@ -142,7 +142,7 @@ class BaseExperiment():
             for inputs, labels, def_area in tqdm(self.valloader):
                 y_pred = self.model(inputs.to(self.device))
                 # Get only the first temporal channel
-                y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
+                y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
                 # Change B, T, C to B, C, T
                 y_pred = torch.transpose(y_pred, 1, 2)
                 labels = labels.type(torch.LongTensor)

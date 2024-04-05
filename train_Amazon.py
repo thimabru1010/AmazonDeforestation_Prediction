@@ -60,7 +60,7 @@ normalize = args.not_normalize
 root_dir = Path(args.root_dir) / pixel_size
 print(root_dir)
 
-prob = 0.5
+prob = 0.7
 copy_fn = lambda x, **kwargs: x.copy()
 transform = A.Compose(
     [

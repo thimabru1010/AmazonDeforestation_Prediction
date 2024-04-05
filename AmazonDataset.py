@@ -588,12 +588,14 @@ class IbamaDETER1km_Dataset(Dataset):
         # def_area = def_area / 8192 * 100
         def_area = def_area # * 100
         
-        # labels[(labels < 1) & (labels > 0)] = 0
-        
         
         # Avoid negative values for the input
         data[data < 0] = 0
         labels[labels > 0] = 1
+        
+        # print(labels.shape)
+        labels = np.expand_dims(labels.max(axis=0), axis=0)
+        # print(labels.shape)
         
         if self.normalize:
             data = data - self.mean / self.std
@@ -608,4 +610,4 @@ class IbamaDETER1km_Dataset(Dataset):
             data = torch.tensor(data)
             labels = torch.tensor(labels)
         # print(data.shape, labels.shape)
-        return data.unsqueeze(1).float(), labels.unsqueeze(1).float(), def_area.float()
+        return data.unsqueeze(1).float(), labels.unsqueeze(1), def_area
