@@ -43,6 +43,7 @@ parser.add_argument('--focal_gamma', type=float, default=4.5, help='Focal loss g
 parser.add_argument('--focal_alpha', type=float, default=None, help='Focal loss alpha hyperparameter')
 parser.add_argument('--translator', type=str, default='gsta', help='Translator model type')
 parser.add_argument('--dilation_size', type=int, default=-1, help='Filter size to apply to dilation')
+parser.add_argument('--prob_aug', type=float, default=0.5, help='probability of apply augmentations')
 args = parser.parse_args()
 
 batch_size = args.batch_size
@@ -60,7 +61,7 @@ normalize = args.not_normalize
 root_dir = Path(args.root_dir) / pixel_size
 print(root_dir)
 
-prob = 0.7
+prob = args.prob_aug
 copy_fn = lambda x, **kwargs: x.copy()
 transform = A.Compose(
     [
@@ -85,7 +86,7 @@ elif pixel_size == '1K':
             dilation_size=args.dilation_size)
     val_data, mask_val_data = train_set.get_validation_set()
     val_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalize=normalize, Debug=Debug, mode='val', patch_size=patch_size,\
-        val_data=val_data, mask_val_data=mask_val_data, predict_horizon=args.predict_horizon, means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size)
+        val_data=val_data, mask_val_data=mask_val_data, window_size=window_size, predict_horizon=args.predict_horizon, means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size)
     width = patch_size
     height = patch_size
 

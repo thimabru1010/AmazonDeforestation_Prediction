@@ -41,7 +41,6 @@ class SimVP_Model(nn.Module):
         if model_type == 'incepu':
             self.hid = MidIncepNet(T*hid_S, hid_T, N_T)
         elif model_type == 'timesformer':
-            print(H)
             self.hid = TimeSformer(img_size=H, num_classes=1, num_frames=T, attention_type='divided_space_time')
         else:
             self.hid = MidMetaNet(T*hid_S, hid_T, N_T,
@@ -67,9 +66,9 @@ class SimVP_Model(nn.Module):
         # z = embed.view(B, T, C_, H_, W_)
         # print(B, C_, T, H_, W_)
         z = embed.view(B, C_, T, H_, W_) # Needed for timesformer
-        # print(z.shape)
+        print(z.shape)
         hid = self.hid(z)
-        # print(hid.shape)
+        print(hid.shape)
         hid = hid.view(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)
