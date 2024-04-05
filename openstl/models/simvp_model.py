@@ -41,6 +41,7 @@ class SimVP_Model(nn.Module):
         if model_type == 'incepu':
             self.hid = MidIncepNet(T*hid_S, hid_T, N_T)
         elif model_type == 'timesformer':
+            print(H // 2)
             self.hid = TimeSformer(img_size=ori_H // 2, num_classes=1, num_frames=T, attention_type='divided_space_time')
         else:
             self.hid = MidMetaNet(T*hid_S, hid_T, N_T,
