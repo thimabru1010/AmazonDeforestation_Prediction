@@ -9,6 +9,7 @@ import torch.nn.functional as F
 
 from openstl.TimeSformer.timesformer.models.vit import TimeSformer
 # import TimeSformer.timesformer.models.vit as vit
+import sys
 
 class SimVP_Model(nn.Module):
     r"""SimVP Model
@@ -24,6 +25,8 @@ class SimVP_Model(nn.Module):
         super(SimVP_Model, self).__init__()
         
         T, C, H, W = in_shape  # T is pre_seq_length
+        # print(H, W)
+        ori_H = H
         H, W = int(H / 2**(N_S/2)), int(W / 2**(N_S/2))  # downsample 1 / 2**(N_S/2)
         act_inplace = False
         self.enc = Encoder(C, hid_S, N_S, spatio_kernel_enc, act_inplace=act_inplace)
@@ -38,8 +41,7 @@ class SimVP_Model(nn.Module):
         if model_type == 'incepu':
             self.hid = MidIncepNet(T*hid_S, hid_T, N_T)
         elif model_type == 'timesformer':
-            # print(H)
-            self.hid = TimeSformer(img_size=H, num_classes=1, num_frames=T, attention_type='divided_space_time')
+            self.hid = TimeSformer(img_size=ori_H // 2, num_classes=1, num_frames=T, attention_type='divided_space_time')
         else:
             self.hid = MidMetaNet(T*hid_S, hid_T, N_T,
                 input_resolution=(H, W), model_type=model_type,
@@ -47,10 +49,10 @@ class SimVP_Model(nn.Module):
         
         # mid_emb_size = H * W * T * 32 * batch_size
         # self.mid_mlp = nn.Linear(T*hid_S, 1)
-        self.mid_mlp = nn.Sequential(nn.Linear(768, batch_size*768),
-                                     nn.ReLU(),
-                                     nn.Linear(batch_size*768, 1)
-        )
+        # self.mid_mlp = nn.Sequential(nn.Linear(768, batch_size*768),
+        #                              nn.ReLU(),
+        #                              nn.Linear(batch_size*768, 1)
+        # )
 
     def forward(self, x_raw, **kwargs):
         B, T, C, H, W = x_raw.shape
@@ -64,21 +66,16 @@ class SimVP_Model(nn.Module):
         # z = embed.view(B, T, C_, H_, W_)
         # print(B, C_, T, H_, W_)
         z = embed.view(B, C_, T, H_, W_) # Needed for timesformer
-        # print('DEBUG MID')
-        # print(z.shape)
-        hid, emb = self.hid(z)
-
-        Y_mid = self.mid_mlp(emb)
-        hid = hid.reshape(B*T, C_, H_, W_)
+        hid = self.hid(z)
+        hid = hid.view(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)
         #! ALTERADO
         # print('DEBUG SimVP_Model Forward')
         # print(B, T, C, H, W)
         # print(Y.shape)
-        Y = Y.reshape(B, T, -1, H, W)
-        Y_mid = Y_mid.reshape(B, -1)
-        return Y, Y_mid
+        Y = Y.view(B, T, -1, H, W)
+        return Y
 
 
 def sampling_generator(N, reverse=False):

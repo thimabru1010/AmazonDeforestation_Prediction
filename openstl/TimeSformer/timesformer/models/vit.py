@@ -183,6 +183,7 @@ class VisionTransformer(nn.Module):
                  drop_path_rate=0.1, hybrid_backbone=None, norm_layer=nn.LayerNorm, num_frames=8,\
                      attention_type='divided_space_time', dropout=0.):
         super().__init__()
+
         self.attention_type = attention_type
         self.depth = depth
         self.dropout = nn.Dropout(dropout)
@@ -190,8 +191,8 @@ class VisionTransformer(nn.Module):
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.patch_embed = PatchEmbed(
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
-        num_patches = self.patch_embed.num_patches
-
+        num_patches = int(self.patch_embed.num_patches)
+        
         ## Positional Embeddings
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches+1, embed_dim))
@@ -303,9 +304,9 @@ class VisionTransformer(nn.Module):
         return x[:, 0]
 
     def forward(self, x):
-        emb = self.forward_features(x)
-        x = self.head(emb)
-        return x, emb
+        x = self.forward_features(x)
+        x = self.head(x)
+        return x
 
 def _conv_filter(state_dict, patch_size=16):
     """ convert patch embedding weight from manual patchify + linear proj to conv"""

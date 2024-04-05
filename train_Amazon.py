@@ -88,8 +88,6 @@ elif pixel_size == '1K':
     width = patch_size
     height = patch_size
 
-print(len(train_set), len(val_set))
-
 dataloader_train = torch.utils.data.DataLoader(
     train_set, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=num_workers)
 dataloader_val = torch.utils.data.DataLoader(

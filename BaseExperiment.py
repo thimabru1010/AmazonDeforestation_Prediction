@@ -103,7 +103,7 @@ class BaseExperiment():
             # Zero your gradients for every batch!
             self.optm.zero_grad()
             
-            y_pred, mid_pred = self.model(inputs.to(self.device))
+            y_pred = self.model(inputs.to(self.device))
             # Get only the first temporal channel
             y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
             y_pred = torch.transpose(y_pred, 1, 2)
@@ -112,20 +112,20 @@ class BaseExperiment():
             # print(mid_pred[:, 0].shape, def_area.shape)
             # print(mid_pred[:, 0], def_area)
             
-            area_reg = self.mse(mid_pred[:, 0], def_area.to(self.device))
+            # area_reg = self.mse(mid_pred[:, 0], def_area.to(self.device))
             # area_reg.backward()
             # print(y_pred.shape, labels.shape, labels.squeeze(2).shape)
             # print(y_pred.dtype, labels.squeeze(2).dtype)
             loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
-            total_loss = loss + area_reg
-            total_loss.backward()
-            # loss.backward()
+            # total_loss = loss + area_reg
+            # total_loss.backward()
+            loss.backward()
             
             # Adjust learning weights
             self.optm.step()
             
             train_loss += loss.detach()
-            train_area_reg += area_reg.detach()
+            # train_area_reg += area_reg.detach()
             
         train_loss = train_loss / len(self.trainloader)
         train_area_reg = train_area_reg / len(self.trainloader)
@@ -140,14 +140,14 @@ class BaseExperiment():
         # Disable gradient computation and reduce memory consumption.
         with torch.no_grad():
             for inputs, labels, def_area in tqdm(self.valloader):
-                y_pred, mid_pred = self.model(inputs.to(self.device))
+                y_pred = self.model(inputs.to(self.device))
                 # Get only the first temporal channel
                 y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
                 # Change B, T, C to B, C, T
                 y_pred = torch.transpose(y_pred, 1, 2)
                 labels = labels.type(torch.LongTensor)
                 
-                area_reg = self.mse(mid_pred, def_area.to(self.device))
+                # area_reg = self.mse(mid_pred, def_area.to(self.device))
                 
                 loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
                 # mae = self.mae(y_pred, labels.to(self.device))
@@ -166,7 +166,7 @@ class BaseExperiment():
                     val_aux_metrics[metric_name] += self.aux_metrics[metric_name](y_pred, labels)
                 
                 val_loss += loss.detach()
-                val_area_reg += area_reg.detach()
+                # val_area_reg += area_reg.detach()
             
         val_loss = val_loss / len(self.valloader)
         val_area_reg = val_area_reg / len(self.valloader)
