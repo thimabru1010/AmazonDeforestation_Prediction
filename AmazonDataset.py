@@ -461,12 +461,12 @@ class IbamaDETER1km_Dataset(Dataset):
             print(deter_img.max(), deter_img.min())
             # 1/0
             
-            # new_deter_img = []
-            # for i in range(deter_img.shape[0]):
-            #     new_deter_img.append(block_reduce(deter_img[i], (4, 4), np.sum))
-            # deter_img = np.stack(new_deter_img, axis=0)
-            # del new_deter_img
-            # mask = block_reduce(mask, (2, 2), np.sum)                
+            new_deter_img = []
+            for i in range(deter_img.shape[0]):
+                new_deter_img.append(block_reduce(deter_img[i], (4, 4), np.sum))
+            deter_img = np.stack(new_deter_img, axis=0)
+            del new_deter_img
+            mask = block_reduce(mask, (4, 4), np.sum)                
             
             # deter_img[deter_img > 0] = 1
             # deter_img = np.logical_not(deter_img)
