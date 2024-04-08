@@ -46,6 +46,7 @@ parser.add_argument('--dilation_size', type=int, default=-1, help='Filter size t
 parser.add_argument('--prob_aug', type=float, default=0.5, help='probability of apply augmentations')
 parser.add_argument('--pool_size', type=int, default=1, help='Pooling size to apply to original image')
 parser.add_argument('--binary', type=str, default='both',  choices=['input', 'output', 'both'], help='Select which part of data to be transformed into categories')
+parser.add_argument('--aggregate_output', action='store_true', help='Enable or disable aggregate output with Maximum')
 args = parser.parse_args()
 
 batch_size = args.batch_size
@@ -85,11 +86,13 @@ if pixel_size == '25K':
 elif pixel_size == '1K':
     train_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalization=normalization, Debug=Debug, transform=transform,\
         patch_size=patch_size, overlap=overlap, min_def=min_def, window_size=window_size, predict_horizon=args.predict_horizon,\
-            dilation_size=args.dilation_size, pool_size=args.pool_size, binary=args.binary)
+            dilation_size=args.dilation_size, pool_size=args.pool_size, binary=args.binary,\
+                aggregate_output=args.aggregate_output)
     val_data, mask_val_data = train_set.get_validation_set()
     val_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalization=normalization, Debug=Debug, mode='val', patch_size=patch_size,\
         val_data=val_data, mask_val_data=mask_val_data, window_size=window_size, predict_horizon=args.predict_horizon,\
-            means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size, binary=args.binary)
+            means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size, binary=args.binary,\
+                aggregate_output=args.aggregate_output)
     width = patch_size
     height = patch_size
 
@@ -128,7 +131,8 @@ custom_training_config = {
     'sgd_momentum': args.sgd_momentum,
     'focal_gamma': args.focal_gamma,
     'focal_alpha': args.focal_alpha,
-    'dilation_size': args.dilation_size
+    'dilation_size': args.dilation_size,
+    'aggregate_output': args.aggregate_output
 }
 
 custom_model_config = {
@@ -167,7 +171,8 @@ elif pixel_size == '1K':
     #     mask_val_data=mask_test_data, means=[train_set.mean], stds=[train_set.std])
     test_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalization=normalization, Debug=Debug, mode='val', patch_size=patch_size,\
         val_data=val_data, mask_val_data=mask_val_data, window_size=window_size, predict_horizon=args.predict_horizon,\
-            means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size, binary=args.binary)
+            means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size, binary=args.binary,\
+                aggregate_output=args.aggregate_output)
 
 dataloader_test = torch.utils.data.DataLoader(
     test_set, batch_size=1, shuffle=False, pin_memory=True)

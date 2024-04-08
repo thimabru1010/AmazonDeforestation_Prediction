@@ -443,7 +443,7 @@ class IbamaDETER1km_Dataset(Dataset):
     def __init__(self, root_dir: Path, normalization: str='mean_std', transform: torchvision.transforms=None,
                 Debug: bool=False, mode: str='train', patch_size=64, overlap=0.1, min_def=0.02, window_size=6,\
                     predict_horizon=2, val_data=None, mask_val_data=None, means=None, stds=None, dilation_size=-1,
-                    pool_size=1, binary='both'):
+                    pool_size=1, binary='both', aggregate_output=False):
         super(IbamaDETER1km_Dataset, self).__init__()
         self.root_dir = root_dir
         ibama_folder_path = root_dir / 'tiff_filled'
@@ -538,6 +538,7 @@ class IbamaDETER1km_Dataset(Dataset):
         if Debug:
             self.data_files = self.data_files[:20]
         
+        self.aggregate_output = aggregate_output
         self.binary = binary
         self.predict_horizon = predict_horizon
         self.past_window = window_size - predict_horizon    
@@ -600,7 +601,8 @@ class IbamaDETER1km_Dataset(Dataset):
         
         # Aggregate the temporal dimension (OR operation)
         # print(labels.shape)
-        labels = np.expand_dims(labels.max(axis=0), axis=0)
+        if self.aggregate_output:
+            labels = np.expand_dims(labels.max(axis=0), axis=0)
         # print(labels.shape)
         
         if self.normalization == 'mean_std':

@@ -34,7 +34,6 @@ class BaseExperiment():
         print('Input shape:', in_shape)
         torch.manual_seed(seed)
         # self.model = TimeSformer(img_size=in_shape[2], num_classes=1, num_frames=in_shape[0], attention_type='divided_space_time')
-        
         self.model = self._build_model(in_shape, custom_model_config['num_classes'], custom_model_config, training_config['batch_size'])
         
         self.aux_metrics = {}
@@ -89,6 +88,10 @@ class BaseExperiment():
         self.valloader = valloader
         
         self.predict_horizon = training_config['aft_seq_length']
+        # if training_config['aggregate_output']:
+        #     self.predict_horizon = 1
+            
+        self.aggregate_output = training_config['aggregate_output']
         
     def _build_model(self, in_shape, num_classes, custom_model_config, batch_size):
         return SimVP_Model(in_shape=in_shape, nclasses=num_classes, batch_size=batch_size, **custom_model_config).to(self.device)
@@ -107,20 +110,26 @@ class BaseExperiment():
             
             y_pred = self.model(inputs.to(self.device))
             # Get only the first temporal channel
-            y_pred = y_pred[:, :self.predict_horizon].mean(dim=1).unsqueeze(1)
-            # y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
+            if self.aggregate_output:
+                y_pred = y_pred[:, :self.predict_horizon].contiguous().mean(dim=1).unsqueeze(1)
+            else:
+                y_pred = y_pred[:, :self.predict_horizon].contiguous()
+            # print(y_pred.shape)
+            # y_pred = y_pred[:, :self.predict_horizon].mean(dim=1).unsqueeze(1)
+            # y_pred = y_pred[:, 0].contiguous()#.unsqueeze(1)
             # Change B, T, C to B, C, T
-            y_pred = torch.transpose(y_pred, 1, 2)
+            # y_pred = torch.transpose(y_pred, 1, 2)
             labels = labels.type(torch.LongTensor)
             
             # print(mid_pred[:, 0].shape, def_area.shape)
             # print(mid_pred[:, 0], def_area)
             
             # area_reg = self.mse(mid_pred[:, 0], def_area.to(self.device))
-            # area_reg.backward()
+
             # print(y_pred.shape, labels.shape, labels.squeeze(2).shape)
             # print(y_pred.dtype, labels.squeeze(2).dtype)
-            loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
+            # print(y_pred.shape, labels.shape)
+            loss = self.loss(y_pred.squeeze(2), labels.squeeze(2).to(self.device))
             # total_loss = loss + area_reg
             # total_loss.backward()
             loss.backward()
@@ -147,22 +156,26 @@ class BaseExperiment():
                 y_pred = self.model(inputs.to(self.device))
                 # Get only the first temporal channel
                 # y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
-                y_pred = y_pred[:, :self.predict_horizon].mean(dim=1).unsqueeze(1)
+                if self.aggregate_output:
+                    y_pred = y_pred[:, :self.predict_horizon].contiguous().mean(dim=1).unsqueeze(1)
+                else:
+                    y_pred = y_pred[:, :self.predict_horizon].contiguous()
+                # y_pred = y_pred[:, :self.predict_horizon].mean(dim=1).unsqueeze(1)
                 # Change B, T, C to B, C, T
-                y_pred = torch.transpose(y_pred, 1, 2)
+                # y_pred = torch.transpose(y_pred, 1, 2)
                 labels = labels.type(torch.LongTensor)
                 
                 # area_reg = self.mse(mid_pred, def_area.to(self.device))
                 
-                loss = self.loss(y_pred, labels.squeeze(2).to(self.device))
+                loss = self.loss(y_pred.squeeze(2), labels.squeeze(2).to(self.device))
                 # mae = self.mae(y_pred, labels.to(self.device))
                 # y_pred = F.softmax(y_pred, dim=1)
                 # y_pred = torch.argmax(y_pred, dim=1)
                 y_pred = F.sigmoid(y_pred)
                 y_pred[y_pred >= 0.5] = 1
                 y_pred[y_pred < 0.5] = 0
-                y_pred = y_pred.squeeze(1)
-                labels = labels.squeeze(2)
+                y_pred = y_pred#.squeeze(1)
+                labels = labels#.squeeze(2)
                 # print(y_pred.shape, labels.shape)
                 y_pred = y_pred[labels != -1].cpu().numpy()
                 labels = labels[labels != -1].cpu().numpy()
@@ -234,7 +247,10 @@ def test_model(testloader, training_config, custom_model_config):
     device = "cuda:0"
     in_shape = training_config['in_shape']
     
-    model = _build_model(in_shape, custom_model_config['num_classes'], custom_model_config,\
+    C_out = training_config['aft_seq_length']
+    if training_config['aggregate_output']:
+        C_out = 1
+    model = _build_model(in_shape, C_out, custom_model_config,\
         training_config['batch_size'], device)
     # model = _build_model(in_shape, None, custom_model_config, device)
     model.load_state_dict(torch.load(os.path.join(work_dir_path, 'checkpoint.pth')))
@@ -276,9 +292,13 @@ def test_model(testloader, training_config, custom_model_config):
             y_pred = model(inputs.to(device))
             # Get only the first temporal channel
             # y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
-            y_pred = y_pred[:, :training_config['aft_seq_length']].mean(dim=1).unsqueeze(1)
+            if training_config['aggregate_output']:
+                y_pred = y_pred[:, :training_config['aft_seq_length']].contiguous().mean(dim=1).unsqueeze(1)
+            else:
+                y_pred = y_pred[:, :training_config['aft_seq_length']]
+            # y_pred = y_pred[:, :training_config['aft_seq_length']].mean(dim=1).unsqueeze(1)
             # Change B, T, C to B, C, T
-            y_pred = torch.transpose(y_pred, 1, 2)
+            # y_pred = torch.transpose(y_pred, 1, 2)
             labels = labels.type(torch.LongTensor)
             
             # if torch.all(labels == -1):
@@ -301,8 +321,8 @@ def test_model(testloader, training_config, custom_model_config):
                 y_pred[y_pred >= 0.5] = 1
                 y_pred[y_pred < 0.5] = 0
                 #TODO: verificar se vai dar problema com sigmoid
-                y_pred = y_pred.squeeze(1)
-                labels = labels.squeeze(2)
+                y_pred = y_pred#.squeeze(1)
+                labels = labels#.squeeze(2)
 
                 # preds.append(y_pred[0].numpy())
                 
@@ -380,7 +400,7 @@ def test_model(testloader, training_config, custom_model_config):
             continue
         
         # y_pred = y_pred[labels != -1].numpy()
-        y_pred = torch.random(0, 1, labels.shape)
+        y_pred = torch.rand(0, 1, labels.shape)
         y_pred[y_pred >= 0.5] = 1
         y_pred[y_pred < 0.5] = 0
         labels = labels[labels != -1].numpy()
