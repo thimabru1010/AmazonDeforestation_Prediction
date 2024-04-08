@@ -88,7 +88,7 @@ class BaseExperiment():
         self.trainloader = trainloader
         self.valloader = valloader
         
-        self.predict_horizon = training_config['predict_horizon']
+        self.predict_horizon = training_config['aft_seq_length']
         
     def _build_model(self, in_shape, num_classes, custom_model_config, batch_size):
         return SimVP_Model(in_shape=in_shape, nclasses=num_classes, batch_size=batch_size, **custom_model_config).to(self.device)
