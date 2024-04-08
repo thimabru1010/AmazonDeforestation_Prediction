@@ -88,6 +88,8 @@ class BaseExperiment():
         self.trainloader = trainloader
         self.valloader = valloader
         
+        self.predict_horizon = training_config['predict_horizon']
+        
     def _build_model(self, in_shape, num_classes, custom_model_config, batch_size):
         return SimVP_Model(in_shape=in_shape, nclasses=num_classes, batch_size=batch_size, **custom_model_config).to(self.device)
     
@@ -142,6 +144,7 @@ class BaseExperiment():
             for inputs, labels, def_area in tqdm(self.valloader):
                 y_pred = self.model(inputs.to(self.device))
                 # Get only the first temporal channel
+                # TODO: apply predict horizon and take the mean of the predictions
                 y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
                 # Change B, T, C to B, C, T
                 y_pred = torch.transpose(y_pred, 1, 2)
@@ -267,10 +270,10 @@ def test_model(testloader, training_config, custom_model_config):
     labels_stack = []
     val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
     with torch.no_grad():
-        for inputs, labels in tqdm(testloader):
+        for inputs, labels, _ in tqdm(testloader):
             y_pred, _ = model(inputs.to(device))
             # Get only the first temporal channel
-            y_pred = y_pred[:, :2].contiguous()#.unsqueeze(1)
+            y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
             # Change B, T, C to B, C, T
             y_pred = torch.transpose(y_pred, 1, 2)
             labels = labels.type(torch.LongTensor)

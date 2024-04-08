@@ -598,6 +598,7 @@ class IbamaDETER1km_Dataset(Dataset):
         if self.binary in ['output', 'both']:
             labels[labels > 0] = 1
         
+        # Aggregate the temporal dimension (OR operation)
         # print(labels.shape)
         labels = np.expand_dims(labels.max(axis=0), axis=0)
         # print(labels.shape)
