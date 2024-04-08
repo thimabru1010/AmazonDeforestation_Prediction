@@ -400,7 +400,7 @@ def test_model(testloader, training_config, custom_model_config):
             continue
         
         # y_pred = y_pred[labels != -1].numpy()
-        y_pred = torch.rand(0, 1, tuple(labels.shape()))
+        y_pred = torch.rand(0, 1, tuple(labels.shape))
         y_pred[y_pred >= 0.5] = 1
         y_pred[y_pred < 0.5] = 0
         labels = labels[labels != -1].numpy()
