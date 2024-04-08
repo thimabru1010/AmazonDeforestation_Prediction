@@ -374,7 +374,7 @@ def test_model(testloader, training_config, custom_model_config):
     # #! Classification Baseline Metrics
     skip_cont = 0
     val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
-    for inputs, labels in tqdm(testloader):
+    for inputs, labels, _ in tqdm(testloader):
         if torch.all(labels == -1):
             skip_cont += 1
             continue
