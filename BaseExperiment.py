@@ -275,7 +275,8 @@ def test_model(testloader, training_config, custom_model_config):
         for inputs, labels, _ in tqdm(testloader):
             y_pred = model(inputs.to(device))
             # Get only the first temporal channel
-            y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
+            # y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
+            y_pred = y_pred[:, :training_config['aft_seq_length']].mean(dim=1).unsqueeze(1)
             # Change B, T, C to B, C, T
             y_pred = torch.transpose(y_pred, 1, 2)
             labels = labels.type(torch.LongTensor)
@@ -380,6 +381,8 @@ def test_model(testloader, training_config, custom_model_config):
         
         # y_pred = y_pred[labels != -1].numpy()
         y_pred = torch.random(0, 1, labels.shape)
+        y_pred[y_pred >= 0.5] = 1
+        y_pred[y_pred < 0.5] = 0
         labels = labels[labels != -1].numpy()
         
         for metric_name in aux_metrics.keys():
