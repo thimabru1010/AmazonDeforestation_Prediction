@@ -271,7 +271,7 @@ def test_model(testloader, training_config, custom_model_config):
     val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
     with torch.no_grad():
         for inputs, labels, _ in tqdm(testloader):
-            y_pred, _ = model(inputs.to(device))
+            y_pred = model(inputs.to(device))
             # Get only the first temporal channel
             y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
             # Change B, T, C to B, C, T
