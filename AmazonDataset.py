@@ -440,9 +440,10 @@ class IbamaInpe25km_Dataset(Dataset):
 # ----------------------------------------------------------------------------------------------
 
 class IbamaDETER1km_Dataset(Dataset):
-    def __init__(self, root_dir: Path, normalize: bool=True, transform: torchvision.transforms=None,
+    def __init__(self, root_dir: Path, normalization: str='mean_std', transform: torchvision.transforms=None,
                 Debug: bool=False, mode: str='train', patch_size=64, overlap=0.1, min_def=0.02, window_size=6,\
-                    predict_horizon=2, val_data=None, mask_val_data=None, means=None, stds=None, dilation_size=-1):
+                    predict_horizon=2, val_data=None, mask_val_data=None, means=None, stds=None, dilation_size=-1,
+                    pool_size=1, binary='both'):
         super(IbamaDETER1km_Dataset, self).__init__()
         self.root_dir = root_dir
         ibama_folder_path = root_dir / 'tiff_filled'
@@ -455,23 +456,25 @@ class IbamaDETER1km_Dataset(Dataset):
             mask = load_npy_image('data/IBAMA_INPE/1K/tiff_filled/mask.npy')
             mask = mask[:deter_img.shape[1], :deter_img.shape[2]]
             
-            T, H, W = deter_img.shape
-            min_max_scaler = MinMaxScaler(feature_range=(0, 1))
-            deter_img = min_max_scaler.fit_transform(deter_img.reshape(T, -1)).reshape(T, H, W)
-            print(deter_img.max(), deter_img.min())
-            # 1/0
+            if normalization == 'minmax':
+                print(f'Before Scaling Max: {deter_img.max()} - Min: {deter_img.min()}')
+                T, H, W = deter_img.shape
+                min_max_scaler = MinMaxScaler(feature_range=(0, 1))
+                deter_img = min_max_scaler.fit_transform(deter_img.reshape(T, -1)).reshape(T, H, W)
+                print(f'After Scaling Max: {deter_img.max()} - Min: {deter_img.min()}')
             
-            new_deter_img = []
-            for i in range(deter_img.shape[0]):
-                new_deter_img.append(block_reduce(deter_img[i], (4, 4), np.sum))
-            deter_img = np.stack(new_deter_img, axis=0)
-            del new_deter_img
-            mask = block_reduce(mask, (4, 4), np.sum)                
+            if pool_size > 1:
+                new_deter_img = [block_reduce(deter_img[i], (pool_size, pool_size), np.sum)
+                                 for i in range(deter_img.shape[0])]
+                deter_img = np.stack(new_deter_img, axis=0)
+                del new_deter_img
+                mask = block_reduce(mask, (pool_size, pool_size), np.sum)                
             
-            # deter_img[deter_img > 0] = 1
-            # deter_img = np.logical_not(deter_img)
-            # deter_img = 1 - deter_img
+            if binary in ['input', 'both']:
+                deter_img[deter_img > 0] = 1
+                
             deter_img[:, mask == 0] = -1
+            # TODO: Increase image size instead of cut it
             # xcut = (deter_img.shape[1] // patch_size) * patch_size
             # ycut = (deter_img.shape[2] // patch_size) * patch_size
             # deter_img = deter_img[:, :xcut, :ycut]
@@ -510,9 +513,6 @@ class IbamaDETER1km_Dataset(Dataset):
             # mask_test_patches = extract_sorted_patches(mask, patch_size)
             # print('Mask Test Patches:', mask_test_patches.shape)
             
-            
-            # self.data_files = train_patches
-            # self.val_files = val_patches
             self.data_files, self.mask_files, _ = divide_pred_windows(train_patches, min_def=min_def, window_size=window_size)
             # print(f'Training shape: {self.data_files.shape} - {self.mask_files.shape}')
             print(f'Training shape: {self.data_files.shape}')
@@ -537,10 +537,11 @@ class IbamaDETER1km_Dataset(Dataset):
         
         if Debug:
             self.data_files = self.data_files[:20]
-            
+        
+        self.binary = binary
         self.predict_horizon = predict_horizon
         self.past_window = window_size - predict_horizon    
-        self.normalize = normalize
+        self.normalization = normalization
         self.transform = transform
         if dilation_size == -1:
             self.kernel = None
@@ -578,8 +579,6 @@ class IbamaDETER1km_Dataset(Dataset):
                     # labels = cv2.dilate(labels, self.kernel, iterations=1)
         # labels[:, mask == 0] = -1          
         
-        # patch_window = np.logical_not(patch_window)
-        # patch_window = 1 - patch_window
         patch_window[patch_window_cpy == -1] = -1
         
         data = patch_window[:self.past_window]
@@ -596,13 +595,14 @@ class IbamaDETER1km_Dataset(Dataset):
         
         # Avoid negative values for the input
         data[data < 0] = 0
-        labels[labels > 0] = 1
+        if self.binary in ['output', 'both']:
+            labels[labels > 0] = 1
         
         # print(labels.shape)
         labels = np.expand_dims(labels.max(axis=0), axis=0)
         # print(labels.shape)
         
-        if self.normalize:
+        if self.normalization == 'mean_std':
             data = data - self.mean / self.std
             
         if self.transform:

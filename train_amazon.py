@@ -28,7 +28,7 @@ parser.add_argument('--predict_horizon', type=int, default=2, help='Predict hori
 parser.add_argument('--min_def', type=float, default=0.005, help='Minimum deforestation value for the dataset')
 parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for data loading')
 parser.add_argument('--debug', action='store_true', help='Enable or disable debug mode')
-parser.add_argument('--not_normalize', action='store_false', help='Enable or disable normalization')
+parser.add_argument('--normalization', type=str, default='mean_std',  choices=['mean_std', 'minmax'], help='Select Which type of nornalization to be used. Standardization or MinMax Scaler')
 parser.add_argument('--pixel_size', type=str, default='1K', help='Pixel size for the images')
 parser.add_argument('--N_S', type=int, default=3, help='Number of Encoder Layers')
 parser.add_argument('--N_T', type=int, default=3, help='Number of Temporal Layers')
@@ -44,6 +44,8 @@ parser.add_argument('--focal_alpha', type=float, default=None, help='Focal loss 
 parser.add_argument('--translator', type=str, default='gsta', help='Translator model type')
 parser.add_argument('--dilation_size', type=int, default=-1, help='Filter size to apply to dilation')
 parser.add_argument('--prob_aug', type=float, default=0.5, help='probability of apply augmentations')
+parser.add_argument('--pool_size', type=int, default=1, help='Pooling size to apply to original image')
+parser.add_argument('--binary', type=str, default='both',  choices=['input', 'output', 'both'], help='Select which part of data to be transformed into categories')
 args = parser.parse_args()
 
 batch_size = args.batch_size
@@ -55,7 +57,7 @@ patch_size = args.patch_size
 overlap = args.overlap
 window_size = args.past_window + args.predict_horizon
 min_def = args.min_def
-normalize = args.not_normalize
+normalization = args.normalization
 
 # root_dir = Path(f'/home/thiago/AmazonDeforestation_Prediction/OpenSTL/data/IBAMA_INPE/{pixel_size}')
 root_dir = Path(args.root_dir) / pixel_size
@@ -81,12 +83,13 @@ if pixel_size == '25K':
     width = 136
     height = 98
 elif pixel_size == '1K':
-    train_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalize=normalize, Debug=Debug, transform=transform,\
+    train_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalization=normalization, Debug=Debug, transform=transform,\
         patch_size=patch_size, overlap=overlap, min_def=min_def, window_size=window_size, predict_horizon=args.predict_horizon,\
-            dilation_size=args.dilation_size)
+            dilation_size=args.dilation_size, pool_size=args.pool_size, binary=args.binary)
     val_data, mask_val_data = train_set.get_validation_set()
-    val_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalize=normalize, Debug=Debug, mode='val', patch_size=patch_size,\
-        val_data=val_data, mask_val_data=mask_val_data, window_size=window_size, predict_horizon=args.predict_horizon, means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size)
+    val_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalization=normalization, Debug=Debug, mode='val', patch_size=patch_size,\
+        val_data=val_data, mask_val_data=mask_val_data, window_size=window_size, predict_horizon=args.predict_horizon,\
+            means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size, binary=args.binary)
     width = patch_size
     height = patch_size
 
@@ -118,7 +121,7 @@ custom_training_config = {
     'overlap': overlap,
     'loss': 'focal',
     'aux_metrics': ['CM'],
-    'normalize': normalize,
+    'normalization': normalization,
     'scheduler_step_size': args.scheduler_step_size,
     'scheduler_decay_factor': args.scheduler_decay_factor,
     'optmizer': args.optmizer,
@@ -160,8 +163,11 @@ elif pixel_size == '1K':
     test_data, mask_test_data = train_set.get_test_set()
     # print(len(test_data), len(mask_test_data))
     print(test_data.shape)
-    test_set = IbamaDETER1km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data,\
-        mask_val_data=mask_test_data, means=[train_set.mean], stds=[train_set.std])
+    # test_set = IbamaDETER1km_Dataset(root_dir=root_dir, Debug=Debug, mode='val', val_data=test_data,\
+    #     mask_val_data=mask_test_data, means=[train_set.mean], stds=[train_set.std])
+    test_set = IbamaDETER1km_Dataset(root_dir=root_dir, normalization=normalization, Debug=Debug, mode='val', patch_size=patch_size,\
+        val_data=val_data, mask_val_data=mask_val_data, window_size=window_size, predict_horizon=args.predict_horizon,\
+            means=[train_set.mean], stds=[train_set.std], dilation_size=args.dilation_size, binary=args.binary)
 
 dataloader_test = torch.utils.data.DataLoader(
     test_set, batch_size=1, shuffle=False, pin_memory=True)
