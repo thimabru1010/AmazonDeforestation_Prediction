@@ -107,7 +107,9 @@ class BaseExperiment():
             
             y_pred = self.model(inputs.to(self.device))
             # Get only the first temporal channel
-            y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
+            y_pred = y_pred[:, :self.predict_horizon].mean(dim=1).unsqueeze(1)
+            # y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
+            # Change B, T, C to B, C, T
             y_pred = torch.transpose(y_pred, 1, 2)
             labels = labels.type(torch.LongTensor)
             
@@ -144,8 +146,8 @@ class BaseExperiment():
             for inputs, labels, def_area in tqdm(self.valloader):
                 y_pred = self.model(inputs.to(self.device))
                 # Get only the first temporal channel
-                # TODO: apply predict horizon and take the mean of the predictions
-                y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
+                # y_pred = y_pred[:, :1].contiguous()#.unsqueeze(1)
+                y_pred = y_pred[:, :self.predict_horizon].mean(dim=1).unsqueeze(1)
                 # Change B, T, C to B, C, T
                 y_pred = torch.transpose(y_pred, 1, 2)
                 labels = labels.type(torch.LongTensor)
@@ -368,29 +370,60 @@ def test_model(testloader, training_config, custom_model_config):
             # preds = np.stack(preds, axis=0)
             # print(preds.shape)
             test_loss = 0.0
+    # #! Classification Baseline Metrics
+    skip_cont = 0
+    val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
+    for inputs, labels in tqdm(testloader):
+        if torch.all(labels == -1):
+            skip_cont += 1
+            continue
+        
+        # y_pred = y_pred[labels != -1].numpy()
+        y_pred = torch.random(0, 1, labels.shape)
+        labels = labels[labels != -1].numpy()
+        
+        for metric_name in aux_metrics.keys():
+            val_aux_metrics[metric_name] += aux_metrics[metric_name](y_pred, labels)
+    print('Skip cont:', skip_cont)
+    print("======== Classification Baseline Metrics ========")
+    for metric_name in aux_metrics.keys():
+        val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
+        terminal_str = f""
+        for metric_name in val_aux_metrics.keys():
+            if metric_name != 'CM':
+                terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
+    print(terminal_str)
+    print(val_aux_metrics['CM'])
+    cm = val_aux_metrics['CM']
+    TP, FP, FN, TN = cm[0, 0], cm[1, 0], cm[0, 1], cm[1, 1]
+    
+    prec = TN/(TN+FN)
+    rec = TN/(TN+FP)
+    _f1_score1 = 2 * prec * rec / (prec + rec)
     return preds
 
     # #! Classification Baseline Metrics
-    # skip_cont = 0
-    # val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
-    # for inputs, labels in tqdm(testloader):
-    #     if torch.all(labels == -1):
-    #         skip_cont += 1
-    #         continue
+    skip_cont = 0
+    val_aux_metrics = {metric_name: 0 for metric_name in aux_metrics.keys()}
+    for inputs, labels in tqdm(testloader):
+        if torch.all(labels == -1):
+            skip_cont += 1
+            continue
         
-    #     # y_pred = y_pred[labels != -1].numpy()
-    #     labels = labels[labels != -1].numpy()
+        # y_pred = y_pred[labels != -1].numpy()
+        y_pred = torch.random(0, 1, labels.shape)
+        labels = labels[labels != -1].numpy()
         
-    #     for metric_name in aux_metrics.keys():
-    #         val_aux_metrics[metric_name] += aux_metrics[metric_name](labels, labels)
-    # print('Skip cont:', skip_cont)
-    # print("======== Classification Baseline Metrics ========")
-    # for metric_name in aux_metrics.keys():
-    #     val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
-    #     terminal_str = f""
-    #     for metric_name in val_aux_metrics.keys():
-    #         if metric_name != 'CM':
-    #             terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
+        for metric_name in aux_metrics.keys():
+            val_aux_metrics[metric_name] += aux_metrics[metric_name](y_pred, labels)
+    print('Skip cont:', skip_cont)
+    print("======== Classification Baseline Metrics ========")
+    for metric_name in aux_metrics.keys():
+        val_aux_metrics[metric_name] = val_aux_metrics[metric_name] / (len(testloader) - skip_cont)
+        terminal_str = f""
+        for metric_name in val_aux_metrics.keys():
+            if metric_name != 'CM':
+                terminal_str += f"{metric_name} = {val_aux_metrics[metric_name]:.6f} | "
     # print(terminal_str)
     # print(val_aux_metrics['CM'])
     # cm = val_aux_metrics['CM']
