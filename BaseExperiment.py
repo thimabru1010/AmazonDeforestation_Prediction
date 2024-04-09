@@ -399,11 +399,11 @@ def test_model(testloader, training_config, custom_model_config):
             skip_cont += 1
             continue
         
-        # y_pred = y_pred[labels != -1].numpy()
         y_pred = torch.rand(tuple(labels.shape))
         y_pred[y_pred >= 0.5] = 1
         y_pred[y_pred < 0.5] = 0
         labels = labels[labels != -1].numpy()
+        y_pred = y_pred[labels != -1].numpy()
         
         for metric_name in aux_metrics.keys():
             val_aux_metrics[metric_name] += aux_metrics[metric_name](y_pred, labels)
